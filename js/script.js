@@ -4,7 +4,8 @@ jQuery(document).ready(function($) {
         host: '192.168.1.100',
         endpoints: {
             weight: '/weight',
-            dimension: '/dimension'
+            dimension: '/dimension',
+            ip: '/ip'
         }
     };
     
@@ -18,11 +19,173 @@ jQuery(document).ready(function($) {
     const BARCODE_DELAY = 50;
     let isScanning = false; // Nueva variable para controlar si estamos en proceso de escaneo
 
+    // Reemplazar las variables de control de medición secuencial
+    let currentField = null;
+    let isMeasuring = false;
+
     // Variables para control de medición secuencial
     let currentMeasurement = null;
     const measurementSequence = ['weight', 'length', 'width', 'height'];
-    let isMeasuring = false;
     let cycleCompleted = false;
+
+    // Al inicio del archivo, después de la configuración del MEASUREMENT_SERVER
+    let connectionCheckInterval;
+
+    // Función para actualizar el estado visual
+    function updateConnectionStatus(status, message = '') {
+        const statusLight = $('.pdm-status-light');
+        const statusText = $('.pdm-status-text');
+        
+        console.log('Actualizando estado de conexión:', { status, message });
+        
+        // Primero removemos todas las clases
+        statusLight.removeClass('connected disconnected connecting');
+        statusText.removeClass('connected disconnected connecting');
+        
+        switch (status) {
+            case 'connecting':
+                statusText.text('Conectando...')
+                         .addClass('connecting');
+                statusLight.addClass('connecting')
+                          .css('background-color', '#f0ad4e');
+                break;
+            case 'connected':
+                statusText.text('Conectado')
+                         .addClass('connected');
+                statusLight.addClass('connected')
+                          .css('background-color', '#5cb85c');
+                break;
+            case 'disconnected':
+                statusText.text('Sin conexión')
+                         .addClass('disconnected');
+                statusLight.addClass('disconnected')
+                          .css('background-color', '#d9534f');
+                break;
+        }
+        
+        if (message) {
+            console.log('Mensaje adicional:', message);
+        }
+    }
+
+    // Modificar la función de verificación de conexión
+    async function checkConnection() {
+        const currentIp = $('.pdm-current-ip');
+        
+        console.log('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host);
+        updateConnectionStatus('connecting');
+        
+        try {
+            const response = await fetch(`http://${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.ip}`);
+            console.log('Respuesta del servidor:', response);
+            
+            if (response.ok) {
+                console.log('Conexión exitosa al servidor de mediciones');
+                updateConnectionStatus('connected');
+                
+                // Intentar obtener más información del servidor si está disponible
+                try {
+                    const data = await response.json();
+                    console.log('Información adicional del servidor:', data);
+                } catch (e) {
+                    console.log('No hay información adicional disponible');
+                }
+            } else {
+                throw new Error(`Error en la respuesta del servidor: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error de conexión:', {
+                message: error.message,
+                error: error
+            });
+            updateConnectionStatus('disconnected', error.message);
+        }
+        
+        currentIp.text(MEASUREMENT_SERVER.host);
+    }
+
+    // Crear el editor de IP
+    function createIpEditor() {
+        const editor = $(`
+            <div class="pdm-ip-editor">
+                <input type="text" class="pdm-ip-input" value="${MEASUREMENT_SERVER.host}">
+                <button class="button button-primary pdm-save-ip">Guardar</button>
+                <button class="button pdm-cancel-ip">Cancelar</button>
+            </div>
+        `);
+        
+        $('.pdm-connection-indicator').append(editor);
+    }
+
+    // Inicializar la funcionalidad del indicador de conexión
+    function initConnectionIndicator() {
+        createIpEditor();
+        
+        // Mostrar IP al hacer click en la luz
+        $('.pdm-status-light').on('click', function(e) {
+            e.stopPropagation();
+            const $ipInfo = $('.pdm-ip-info');
+            $ipInfo.toggle();
+            
+            // Ocultar el editor si está visible
+            $('.pdm-ip-editor').removeClass('active');
+        });
+        
+        // Mostrar editor de IP
+        $('.pdm-edit-ip').on('click', function(e) {
+            e.stopPropagation();
+            $('.pdm-ip-editor').toggleClass('active');
+        });
+        
+        // Ocultar todo al hacer clic fuera
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.pdm-connection-indicator').length) {
+                $('.pdm-ip-info').hide();
+                $('.pdm-ip-editor').removeClass('active');
+            }
+        });
+        
+        // Evitar que los clics en el editor lo cierren
+        $('.pdm-ip-editor').on('click', function(e) {
+            e.stopPropagation();
+        });
+        
+        // Modificar la función de guardar IP
+        $('.pdm-save-ip').on('click', function() {
+            const newIp = $('.pdm-ip-input').val().trim();
+            console.log('Intentando guardar nueva IP:', newIp);
+            
+            if (newIp) {
+                console.log('IP anterior:', MEASUREMENT_SERVER.host);
+                MEASUREMENT_SERVER.host = newIp;
+                $('.pdm-current-ip').text(newIp);
+                $('.pdm-ip-editor').removeClass('active');
+                $('.pdm-ip-info').hide();
+                
+                console.log('Nueva IP guardada:', MEASUREMENT_SERVER.host);
+                
+                // Reiniciar verificación de conexión
+                console.log('Reiniciando verificación de conexión');
+                clearInterval(connectionCheckInterval);
+                checkConnection();
+                startConnectionCheck();
+            } else {
+                console.warn('Intento de guardar IP vacía');
+            }
+        });
+        
+        // Cancelar edición
+        $('.pdm-cancel-ip').on('click', function() {
+            $('.pdm-ip-editor').removeClass('active');
+            $('.pdm-ip-input').val(MEASUREMENT_SERVER.host);
+        });
+    }
+
+    // Función para iniciar la verificación periódica
+    function startConnectionCheck() {
+        checkConnection(); // Verificación inicial
+        connectionCheckInterval = setInterval(checkConnection, 30000); // Verificar cada 30 segundos
+    }
 
     // Escuchar eventos de teclado en todo el documento
     $(document).on('keypress', function(e) {
@@ -66,6 +229,7 @@ jQuery(document).ready(function($) {
     });
 
     function searchProducts(search, isScanner = false) {
+        console.log('Iniciando búsqueda:', { search, isScanner });
         spinner.show();
         suggestions.hide();
         
@@ -78,15 +242,18 @@ jQuery(document).ready(function($) {
                 search: search
             },
             success: function(response) {
+                console.log('Respuesta de búsqueda:', response);
                 spinner.hide();
                 if (response.success && response.data.length > 0) {
                     if (isScanner) {
+                        console.log('Producto encontrado por scanner:', response.data[0]);
                         displayProduct(response.data[0]);
                         barcodeInput.val(response.data[0].sku);
                     } else {
                         displaySuggestions(response.data);
                     }
                 } else {
+                    console.log('No se encontraron productos:', { search, isScanner });
                     if (isScanner) {
                         alert('Producto no encontrado');
                         productInfo.hide();
@@ -95,7 +262,8 @@ jQuery(document).ready(function($) {
                     }
                 }
             },
-            error: function() {
+            error: function(error) {
+                console.error('Error en búsqueda:', error);
                 spinner.hide();
                 alert('Error al buscar productos');
             }
@@ -144,6 +312,7 @@ jQuery(document).ready(function($) {
     
     $(document).on('click', '.pdm-suggestion-item', function() {
         const product = $(this).data('product');
+        console.log('Producto seleccionado de sugerencias:', product);
         if (product) {
             displayProduct(product);
             suggestions.hide();
@@ -159,34 +328,90 @@ jQuery(document).ready(function($) {
     });
     
     function displayProduct(product) {
+        console.log('Mostrando producto:', product);
         $('#pdm-product-image').attr('src', product.image);
         $('#pdm-product-title').text(product.title);
-        $('#pdm-product-sku').text(product.sku);
+        $('#pdm-product-sku').text(product.sku)
+            .data('product-id', product.id);
         $('#pdm-weight').val(product.weight);
         $('#pdm-length').val(product.length);
         $('#pdm-width').val(product.width);
         $('#pdm-height').val(product.height);
+        $('#pdm-price').text(product.price);
         
-        // Resetear las variables de control al mostrar un nuevo producto
-        currentMeasurement = null;
+        console.log('Datos guardados en elementos:', {
+            sku: $('#pdm-product-sku').text(),
+            productId: $('#pdm-product-sku').data('product-id'),
+            price: $('#pdm-price').text(),
+            weight: $('#pdm-weight').val(),
+            dimensions: {
+                length: $('#pdm-length').val(),
+                width: $('#pdm-width').val(),
+                height: $('#pdm-height').val()
+            }
+        });
+        
+        // Resetear el estado de medición
+        currentField = null;
         isMeasuring = false;
-        cycleCompleted = false;
+        measurementInterval = null;
+        updateFieldVisuals();
         
         productInfo.show();
     }
     
     $('.pdm-save-all').on('click', function() {
-        const productId = $('#pdm-product-sku').data('product-id');
+        const $sku = $('#pdm-product-sku');
+        console.log('Estado actual del elemento SKU:', {
+            element: $sku,
+            text: $sku.text(),
+            dataProductId: $sku.data('product-id')
+        });
+
+        const productId = $sku.data('product-id');
+        console.log('ID del producto a guardar:', productId);
+
         const data = {
+            action: 'pdm_save_dimensions',
+            nonce: pdm_ajax.nonce,
+            product_id: productId,
             weight: $('#pdm-weight').val(),
             length: $('#pdm-length').val(),
             width: $('#pdm-width').val(),
             height: $('#pdm-height').val()
         };
         
-        // Por ahora solo mostrar los datos que se guardarían
-        console.log('Saving data:', data);
-        alert('Save functionality will be implemented here');
+        console.log('Datos a enviar:', data);
+        
+        // Mostrar indicador de carga
+        $(this).addClass('loading').prop('disabled', true);
+        
+        $.ajax({
+            url: pdm_ajax.ajax_url,
+            type: 'POST',
+            data: data,
+            success: function(response) {
+                console.log('Respuesta del servidor:', response);
+                if (response.success) {
+                    alert('Datos guardados correctamente');
+                } else {
+                    console.error('Error en respuesta:', response);
+                    alert('Error al guardar los datos: ' + response.data);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error en la petición:', {
+                    xhr: xhr,
+                    status: status,
+                    error: error
+                });
+                alert('Error al comunicarse con el servidor');
+            },
+            complete: function() {
+                // Quitar indicador de carga
+                $('.pdm-save-all').removeClass('loading').prop('disabled', false);
+            }
+        });
     });
 
     // Función para obtener el peso de la balanza
@@ -289,11 +514,11 @@ jQuery(document).ready(function($) {
         const $stopBtn = $button.nextAll('.stop-measure-btn').first();
         const measureType = $button.data('type');
         
-        console.log('Iniciando medición continua:', measureType);
+        console.log('Iniciando medición para:', measureType);
         
-        // Mostrar botón de detener y ocultar botón de medición
         $button.hide();
         $stopBtn.show();
+        isMeasuring = true;
         
         // Iniciar medición continua
         measurementInterval = true;
@@ -362,19 +587,97 @@ jQuery(document).ready(function($) {
         // Solo procesar si hay un producto seleccionado
         if (!productInfo.is(':visible')) return;
 
-        if (e.key === ' ') { // Barra espaciadora
-            e.preventDefault(); // Prevenir scroll
-            startNextMeasurement();
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            
-            // Si hay una medición en curso, detenerla
-            if (isMeasuring) {
-                $('.stop-measure-btn:visible').click();
-            }
-            
-            // Simular click en el botón de guardar
-            $('.pdm-save-all').click();
+        switch (e.key) {
+            case ' ': // Espacio
+                e.preventDefault();
+                if (!currentField) {
+                    switchField('down'); // Inicializar con el primer campo
+                    return;
+                }
+                
+                // Toggle medición del campo actual
+                if (isMeasuring) {
+                    $(`.stop-measure-btn:visible`).click();
+                } else {
+                    $(`.measure-btn[data-type="${currentField}"]`).click();
+                }
+                break;
+                
+            case 'ArrowUp':
+                e.preventDefault();
+                switchField('up');
+                break;
+                
+            case 'ArrowDown':
+                e.preventDefault();
+                switchField('down');
+                break;
+                
+            case 'Enter':
+                e.preventDefault();
+                // Si hay una medición en curso, detenerla
+                if (isMeasuring) {
+                    $('.stop-measure-btn:visible').click();
+                }
+                // Simular click en el botón de guardar
+                $('.pdm-save-all').click();
+                break;
         }
     });
+
+    // Función para cambiar el campo activo
+    function switchField(direction) {
+        const fields = ['weight', 'length', 'width', 'height'];
+        
+        // Si no hay campo activo, empezar con weight
+        if (!currentField) {
+            currentField = 'weight';
+            $('#pdm-weight').focus().click();
+            console.log('Campo inicial seleccionado:', currentField);
+            return;
+        }
+        
+        // Encontrar el índice actual
+        const currentIndex = fields.indexOf(currentField);
+        let newIndex;
+        
+        // Calcular nuevo índice basado en la dirección
+        if (direction === 'up') {
+            newIndex = currentIndex <= 0 ? fields.length - 1 : currentIndex - 1;
+        } else {
+            newIndex = currentIndex >= fields.length - 1 ? 0 : currentIndex + 1;
+        }
+        
+        // Detener medición actual si está activa
+        if (isMeasuring) {
+            $('.stop-measure-btn:visible').click();
+        }
+        
+        // Actualizar campo actual
+        currentField = fields[newIndex];
+        $(`#pdm-${currentField}`).focus().click();
+        console.log('Cambiando a campo:', currentField);
+    }
+
+    // Agregar estilo visual para el campo activo
+    function updateFieldVisuals() {
+        // Remover resaltado de todos los campos
+        $('.pdm-form-row').removeClass('active-field');
+        
+        // Agregar resaltado al campo actual
+        if (currentField) {
+            $(`#pdm-${currentField}`).closest('.pdm-form-row').addClass('active-field');
+        }
+    }
+
+    // Llamar a updateFieldVisuals cuando cambie el campo activo
+    $(document).on('click', '.pdm-form-row input', function() {
+        const fieldId = $(this).attr('id').replace('pdm-', '');
+        currentField = fieldId;
+        updateFieldVisuals();
+    });
+
+    // Inicializar el indicador de conexión
+    initConnectionIndicator();
+    startConnectionCheck();
 }); 

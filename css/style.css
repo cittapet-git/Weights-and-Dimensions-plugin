@@ -1,37 +1,63 @@
 .pdm-container {
-    max-width: 1000px;
-    margin: 20px auto;
-    padding: 20px;
+    max-width: 100%;
+    margin: 5px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 8px;
+    height: calc(100vh - 80px);
 }
 
 .pdm-search-section {
-    margin-bottom: 30px;
+    grid-column: 1;
+    grid-row: 1;
+    background: #fff;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    max-height: 60px;
+}
+
+.pdm-search-section h2 {
+    margin: 0 0 5px 0;
+    font-size: 14px;
 }
 
 #pdm-barcode-input {
     width: 100%;
-    max-width: 400px;
-    padding: 10px;
-    font-size: 16px;
-    border: 2px solid #ddd;
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid #ddd;
     border-radius: 4px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.07);
+}
+
+.pdm-product-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    grid-column: 1 / -1;
 }
 
 .pdm-product-header {
+    grid-column: 1;
+    grid-row: 2;
     display: flex;
-    align-items: flex-start;
-    margin-bottom: 30px;
-    padding: 20px;
+    flex-direction: column;
+    gap: 8px;
     background: #fff;
+    padding: 10px;
     border: 1px solid #ddd;
-    border-radius: 5px;
+    border-radius: 4px;
+    height: calc(100vh - 150px);
+    overflow-y: auto;
 }
 
 .pdm-product-image {
-    margin-right: 30px;
-    width: auto;
-    min-width: 300px;
-    height: auto;
+    width: 100%;
+    height: 200px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -39,44 +65,61 @@
     border: 1px solid #eee;
     border-radius: 4px;
     overflow: hidden;
-    padding: 10px;
+    margin-bottom: 5px;
 }
 
 .pdm-product-image img {
-    max-width: none;
-    max-height: none;
-    width: auto;
-    height: auto;
-    display: block;
-    transform: scale(1.2);
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 .pdm-product-details {
-    flex: 1;
-    padding: 10px 0;
+    padding: 0;
+}
+
+.pdm-product-details h2 {
+    font-size: 18px;
+    margin: 0 0 10px 0;
+    line-height: 1.2;
+}
+
+.pdm-product-details p {
+    font-size: 14px;
+    margin: 5px 0;
+    color: #333;
 }
 
 .pdm-dimensions-form {
-    max-width: 600px;
+    grid-column: 2;
+    grid-row: 1 / 3;
+    background: #fff;
+    padding: ;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
 }
 
 .pdm-form-row {
     display: flex;
     align-items: center;
-    margin-bottom: 15px;
-    gap: 10px;
+    gap: 8px;
+    margin-bottom: 6px;
 }
 
 .pdm-form-row label {
-    width: 100px;
-    font-weight: bold;
+    width: 80px;
+    font-weight: 500;
+    font-size: 14px;
 }
 
 .pdm-form-row input {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    width: 120px !important;
+    padding: 6px !important;
 }
 
 .pdm-save-btn {
@@ -85,18 +128,18 @@
 
 .search-input-wrapper {
     position: relative;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 .pdm-spinner {
     display: none;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     border: 2px solid #f3f3f3;
     border-top: 2px solid #3498db;
     border-radius: 50%;
     position: absolute;
-    right: 10px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
     animation: spin 1s linear infinite;
@@ -108,30 +151,41 @@
 }
 
 .pdm-suggestions {
-    margin-top: 10px;
+    position: absolute;
+    width: calc(50% - 32px);
+    max-height: 200px;
+    z-index: 1000;
+    background-color: #fff;
     border: 1px solid #ddd;
     border-radius: 4px;
-    max-height: 300px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     overflow-y: auto;
 }
 
 .pdm-suggestion-item {
     display: flex;
-    padding: 15px;
+    padding: 10px 20px;
     border-bottom: 1px solid #eee;
     cursor: pointer;
     align-items: center;
+    transition: background-color 0.2s ease;
+    background-color: #fff;
+}
+
+.pdm-suggestion-item:last-child {
+    border-bottom: none;
 }
 
 .pdm-suggestion-item:hover {
-    background-color: #f0f0f0;
+    background-color: #f8f9fa;
 }
 
 .pdm-suggestion-item img {
-    width: 60px;
-    height: 60px;
+    width: 40px;
+    height: 40px;
     object-fit: cover;
-    margin-right: 15px;
+    margin-right: 12px;
+    border-radius: 3px;
 }
 
 .pdm-suggestion-info {
@@ -139,34 +193,47 @@
 }
 
 .pdm-suggestion-title {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 5px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 3px;
 }
 
 .pdm-suggestion-meta {
     color: #666;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .pdm-dimensions-group {
+    padding: 10px;
+    margin: 0;
     border: 1px solid #eee;
-    padding: 15px;
-    margin: 15px 0;
     border-radius: 4px;
     background: #f9f9f9;
 }
 
+.pdm-dimensions-group h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #666;
+}
+
 .pdm-form-actions {
-    margin-top: 20px;
-    padding-top: 15px;
+    margin-top: auto;
+    padding-top: 8px;
     border-top: 1px solid #eee;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-bottom: 5px;
 }
 
 .pdm-save-all {
-    padding: 10px 20px !important;
+    padding: 8px 15px !important;
     height: auto !important;
     line-height: 1.4 !important;
+    margin-left: auto !important;
+    display: block !important;
 }
 
 /* Ajustar el ancho de los inputs numéricos */
@@ -196,9 +263,11 @@ input[type="number"]:focus {
 
 .measure-btn {
     padding: 4px 8px !important;
-    height: auto !important;
-    line-height: 1 !important;
-    margin-left: 5px !important;
+    height: 30px !important;
+}
+
+.stop-measure-btn {
+    height: 30px !important;
 }
 
 .measure-btn .dashicons {
@@ -221,4 +290,132 @@ input[type="number"]:focus {
 @keyframes spinButton {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+.pdm-form-row.active-field {
+    background-color: #f0f7ff;
+    border-radius: 5px;
+    padding: 10px;
+    margin: -10px;
+    transition: background-color 0.3s ease;
+}
+
+.pdm-form-row.active-field input {
+    border-color: #2271b1;
+}
+
+/* Indicador de conexión */
+.pdm-connection-indicator {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    padding: 8px;
+    border-radius: 4px;
+    z-index: 100;
+}
+
+.pdm-status-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
+
+/* Estados de la luz */
+.pdm-status-light.connecting {
+    background-color: #f0ad4e !important;
+}
+
+.pdm-status-light.connected {
+    background-color: #5cb85c !important;
+}
+
+.pdm-status-light.disconnected {
+    background-color: #d9534f !important;
+}
+
+.pdm-ip-info {
+    background: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.pdm-edit-ip {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    color: #0073aa;
+}
+
+.pdm-edit-ip:hover {
+    color: #00a0d2;
+}
+
+.pdm-ip-editor {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #fff;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 100;
+    display: none;
+}
+
+.pdm-ip-editor.active {
+    display: block;
+}
+
+.pdm-ip-editor input {
+    width: 200px;
+    margin-right: 8px;
+}
+
+/* Estados del texto */
+.pdm-status-text {
+    font-size: 12px;
+    color: #666;
+    margin-right: 8px;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.pdm-status-text.connecting {
+    color: #f0ad4e;
+}
+
+.pdm-status-text.connected {
+    color: #5cb85c;
+}
+
+.pdm-status-text.disconnected {
+    color: #d9534f;
+}
+
+/* Responsive */
+@media screen and (max-width: 1366px) {
+    .pdm-container {
+        margin: 5px;
+        gap: 8px;
+    }
+
+    .pdm-product-image {
+        height: 180px;
+    }
+
+    .pdm-product-details h2 {
+        font-size: 20px;
+        margin: 0 0 15px 0;
+    }
 } 

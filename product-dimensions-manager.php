@@ -11,8 +11,13 @@ if (!defined('ABSPATH')) {
 }
 
 // Enqueue necessary scripts and styles
-function pdm_enqueue_scripts()
+function pdm_enqueue_scripts($hook)
 {
+    // Verificar que estamos en la página correcta del plugin
+    if ('toplevel_page_product-dimensions-manager' !== $hook) {
+        return;
+    }
+
     wp_enqueue_style('pdm-styles', plugins_url('css/style.css', __FILE__));
     wp_enqueue_script('pdm-script', plugins_url('js/script.js', __FILE__), array('jquery'), '1.0', true);
     wp_localize_script('pdm-script', 'pdm_ajax', array(
@@ -42,6 +47,16 @@ function pdm_render_page()
 {
 ?>
     <div class="wrap">
+        <div class="pdm-connection-indicator">
+            <span class="pdm-status-text">Conectando...</span>
+            <div class="pdm-status-light" title="Estado de conexión"></div>
+            <div class="pdm-ip-info" style="display: none;">
+                <span class="pdm-current-ip"></span>
+                <button class="pdm-edit-ip" title="Editar IP">
+                    <span class="dashicons dashicons-edit"></span>
+                </button>
+            </div>
+        </div>
         <h1>Product Dimensions Manager</h1>
         <div class="pdm-container">
             <div class="pdm-search-section">
@@ -49,8 +64,7 @@ function pdm_render_page()
                 <div class="search-input-wrapper">
                     <input type="text"
                         id="pdm-barcode-input"
-                        placeholder="Ingrese código o nombre del producto..."
-                        style="width: 100%; font-size: 16px; padding: 10px;">
+                        placeholder="Ingrese código o nombre del producto...">
                     <div class="pdm-spinner"></div>
                 </div>
                 <div class="pdm-suggestions"></div>
@@ -62,8 +76,9 @@ function pdm_render_page()
                         <img src="" alt="Product Image" id="pdm-product-image" style="max-width: 200px; height: auto;">
                     </div>
                     <div class="pdm-product-details">
-                        <h2 id="pdm-product-title" style="font-size: 24px; margin-bottom: 10px;"></h2>
-                        <p style="font-size: 16px;">SKU: <span id="pdm-product-sku"></span></p>
+                        <h2 id="pdm-product-title"></h2>
+                        <p>SKU: <span id="pdm-product-sku"></span></p>
+                        <p>Precio: $<span id="pdm-price"></span></p>
                     </div>
                 </div>
 
@@ -135,7 +150,7 @@ function pdm_search_product()
     try {
         // Buscar por ID/SKU, código de barras o por título
         if (is_numeric($search)) {
-            if (strlen($search) > 12) {
+            if (strlen($search) >= 10) {
                 // Búsqueda por código de barras
                 $args = array(
                     'post_type' => 'product',
@@ -196,7 +211,8 @@ function pdm_search_product()
                         'weight' => $product->get_weight(),
                         'length' => $dimensions_array['length'] ?? '',
                         'width' => $dimensions_array['width'] ?? '',
-                        'height' => $dimensions_array['height'] ?? ''
+                        'height' => $dimensions_array['height'] ?? '',
+                        'price' => $product->get_price()
                     );
                 }
             }
@@ -209,3 +225,50 @@ function pdm_search_product()
     }
 }
 add_action('wp_ajax_pdm_search_product', 'pdm_search_product');
+
+// AJAX handler para guardar las dimensiones y peso
+function pdm_save_dimensions()
+{
+    check_ajax_referer('pdm_nonce', 'nonce');
+
+    // Verificar permisos
+    if (!current_user_can('edit_products')) {
+        wp_send_json_error('No tienes permisos para editar productos');
+    }
+
+    $product_id = intval($_POST['product_id']);
+    $weight = floatval($_POST['weight']);
+    $length = floatval($_POST['length']);
+    $width = floatval($_POST['width']);
+    $height = floatval($_POST['height']);
+
+    try {
+        $product = wc_get_product($product_id);
+
+        if (!$product) {
+            throw new Exception('Producto no encontrado');
+        }
+
+        // Actualizar dimensiones y peso
+        $product->set_weight($weight);
+        $product->set_length($length);
+        $product->set_width($width);
+        $product->set_height($height);
+
+        // Guardar los cambios
+        $product->save();
+
+        wp_send_json_success([
+            'message' => 'Datos actualizados correctamente',
+            'weight' => $weight,
+            'dimensions' => [
+                'length' => $length,
+                'width' => $width,
+                'height' => $height
+            ]
+        ]);
+    } catch (Exception $e) {
+        wp_send_json_error('Error al guardar los datos: ' . $e->getMessage());
+    }
+}
+add_action('wp_ajax_pdm_save_dimensions', 'pdm_save_dimensions');
