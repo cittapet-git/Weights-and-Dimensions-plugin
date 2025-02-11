@@ -1,0 +1,224 @@
+.pdm-container {
+    max-width: 1000px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.pdm-search-section {
+    margin-bottom: 30px;
+}
+
+#pdm-barcode-input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+}
+
+.pdm-product-header {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.pdm-product-image {
+    margin-right: 30px;
+    width: auto;
+    min-width: 300px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    padding: 10px;
+}
+
+.pdm-product-image img {
+    max-width: none;
+    max-height: none;
+    width: auto;
+    height: auto;
+    display: block;
+    transform: scale(1.2);
+}
+
+.pdm-product-details {
+    flex: 1;
+    padding: 10px 0;
+}
+
+.pdm-dimensions-form {
+    max-width: 600px;
+}
+
+.pdm-form-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+}
+
+.pdm-form-row label {
+    width: 100px;
+    font-weight: bold;
+}
+
+.pdm-form-row input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.pdm-save-btn {
+    padding: 8px 15px !important;
+}
+
+.search-input-wrapper {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.pdm-spinner {
+    display: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #3498db;
+    border-radius: 50%;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: translateY(-50%) rotate(0deg); }
+    100% { transform: translateY(-50%) rotate(360deg); }
+}
+
+.pdm-suggestions {
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.pdm-suggestion-item {
+    display: flex;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    align-items: center;
+}
+
+.pdm-suggestion-item:hover {
+    background-color: #f0f0f0;
+}
+
+.pdm-suggestion-item img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    margin-right: 15px;
+}
+
+.pdm-suggestion-info {
+    flex-grow: 1;
+}
+
+.pdm-suggestion-title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.pdm-suggestion-meta {
+    color: #666;
+    font-size: 14px;
+}
+
+.pdm-dimensions-group {
+    border: 1px solid #eee;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+    background: #f9f9f9;
+}
+
+.pdm-form-actions {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.pdm-save-all {
+    padding: 10px 20px !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+}
+
+/* Ajustar el ancho de los inputs numéricos */
+input[type="number"] {
+    width: 120px !important;
+}
+
+/* Ocultar las flechas de los inputs numéricos en todos los navegadores */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield; /* Añadido para mejor compatibilidad */
+}
+
+/* Restaurar apariencia normal cuando el input está enfocado (opcional) */
+input[type="number"]:focus {
+    outline: none;
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.measure-btn {
+    padding: 4px 8px !important;
+    height: auto !important;
+    line-height: 1 !important;
+    margin-left: 5px !important;
+}
+
+.measure-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+}
+
+.measure-btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.measure-btn.loading .dashicons {
+    display: inline-block;
+    animation: spinButton 1s linear infinite;
+}
+
+@keyframes spinButton {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+} 
