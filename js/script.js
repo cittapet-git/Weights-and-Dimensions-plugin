@@ -109,8 +109,8 @@ jQuery(document).ready(function($) {
         const editor = $(`
             <div class="pdm-ip-editor">
                 <input type="text" class="pdm-ip-input" value="${MEASUREMENT_SERVER.host}">
-                <button class="button button-primary pdm-save-ip">Guardar</button>
-                <button class="button pdm-cancel-ip">Cancelar</button>
+                <button class="button button-primary pdm-save-ip" style='display: none;'>Guardar</button>
+                <button class="button pdm-cancel-ip" style='display: none;'>Cancelar</button>
             </div>
         `);
         
@@ -134,50 +134,50 @@ jQuery(document).ready(function($) {
         // Mostrar editor de IP
         $('.pdm-edit-ip').on('click', function(e) {
             e.stopPropagation();
-            $('.pdm-ip-editor').toggleClass('active');
+            $('.pdm-ip-editor').show();
+                const $ipInfo = $('.pdm-ip-info');
+                const $input = $('.pdm-ip-input');
+                
+                $ipInfo.addClass('editing');
+                $input.val($('.pdm-current-ip').text()).focus();
+                $('.pdm-save-ip').show();
+                $('.pdm-cancel-ip').show();
         });
         
-        // Ocultar todo al hacer clic fuera
-        $(document).on('click', function(e) {
-            if (!$(e.target).closest('.pdm-connection-indicator').length) {
-                $('.pdm-ip-info').hide();
-                $('.pdm-ip-editor').removeClass('active');
-            }
-        });
-        
-        // Evitar que los clics en el editor lo cierren
-        $('.pdm-ip-editor').on('click', function(e) {
-            e.stopPropagation();
-        });
-        
-        // Modificar la función de guardar IP
+        // Guardar IP
         $('.pdm-save-ip').on('click', function() {
+            const $ipInfo = $('.pdm-ip-info');
             const newIp = $('.pdm-ip-input').val().trim();
-            console.log('Intentando guardar nueva IP:', newIp);
             
             if (newIp) {
-                console.log('IP anterior:', MEASUREMENT_SERVER.host);
                 MEASUREMENT_SERVER.host = newIp;
                 $('.pdm-current-ip').text(newIp);
-                $('.pdm-ip-editor').removeClass('active');
-                $('.pdm-ip-info').hide();
-                
-                console.log('Nueva IP guardada:', MEASUREMENT_SERVER.host);
+                $ipInfo.removeClass('editing');
                 
                 // Reiniciar verificación de conexión
-                console.log('Reiniciando verificación de conexión');
                 clearInterval(connectionCheckInterval);
                 checkConnection();
                 startConnectionCheck();
-            } else {
-                console.warn('Intento de guardar IP vacía');
             }
         });
         
-        // Cancelar edición
-        $('.pdm-cancel-ip').on('click', function() {
-            $('.pdm-ip-editor').removeClass('active');
-            $('.pdm-ip-input').val(MEASUREMENT_SERVER.host);
+        // Cancelar al presionar Escape
+        $('.pdm-ip-input').on('keydown', function(e) {
+            if (e.key === 'Escape') {
+                $('.pdm-ip-info').removeClass('editing');
+            } else if (e.key === 'Enter') {
+                $('.pdm-save-ip').click();
+            }
+        });
+        
+        // Cerrar al hacer clic fuera
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.pdm-ip-info').length) {
+                $('.pdm-ip-info').removeClass('editing');
+                $('.pdm-save-ip').hide();
+                $('.pdm-cancel-ip').hide();
+                $('.pdm-ip-editor').hide();
+            }
         });
     }
 
@@ -424,7 +424,7 @@ jQuery(document).ready(function($) {
             const data = await response.json();
             console.log('Datos de peso recibidos:', data);
             console.log('Peso extraído:', data.peso_kg);
-            return data.peso_kg;
+            return Number(data.peso_kg).toFixed(2);
         } catch (error) {
             console.error('Error detallado al obtener el peso:', {
                 message: error.message,
@@ -444,7 +444,7 @@ jQuery(document).ready(function($) {
             const data = await response.json();
             console.log('Datos de dimensión recibidos:', data);
             console.log('Dimensión extraída:', data.dimension_cm);
-            return data.dimension_cm;
+            return Number(data.dimension_cm).toFixed(2);
         } catch (error) {
             console.error('Error detallado al obtener la dimensión:', {
                 message: error.message,

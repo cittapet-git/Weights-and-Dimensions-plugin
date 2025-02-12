@@ -49,20 +49,25 @@ function pdm_render_page()
 {
 ?>
     <div class="wrap">
-        <div class="pdm-connection-indicator">
-            <span class="pdm-status-text">Conectando...</span>
-            <div class="pdm-status-light" title="Estado de conexión"></div>
-            <div class="pdm-ip-info" style="display: none;">
-                <span class="pdm-current-ip"></span>
-                <button class="pdm-edit-ip" title="Editar IP">
-                    <span class="dashicons dashicons-edit"></span>
-                </button>
-            </div>
-        </div>
+
 
         <div class="pdm-container">
             <div class="pdm-search-section">
-                <h2>Buscar Codigo o Nombre:</h2>
+                <div class="pdm-search-header">
+                    <h2>Buscar Codigo o Nombre:</h2>
+                    <div class="pdm-connection-indicator">
+                        <span class="pdm-status-text">Conectado</span>
+                        <div class="pdm-status-light" title="Estado de conexión"></div>
+                        <div class="pdm-ip-info" style="display: none;">
+                            <span class="pdm-current-ip">192.168.1.100</span>
+                            <button class="pdm-edit-ip" title="Editar IP">
+                                <span class="dashicons dashicons-edit"></span>
+                            </button>
+                            <input type="text" class="pdm-ip-input" placeholder="Ingrese IP">
+
+                        </div>
+                    </div>
+                </div>
                 <div class="search-input-wrapper">
                     <input type="text"
                         id="pdm-barcode-input"
@@ -81,11 +86,7 @@ function pdm_render_page()
                         <h2 id="pdm-product-title"></h2>
                         <p>SKU: <span id="pdm-product-sku"></span></p>
                         <p>Precio: $<span id="pdm-price"></span></p>
-                        <div class="pdm-form-actions">
-                            <button class="button button-primary button-large pdm-save-all">
-                                Save Changes
-                            </button>
-                        </div>
+
                     </div>
                 </div>
 
@@ -148,6 +149,11 @@ function pdm_render_page()
                                 </div>
                             </div>
                         </div>
+                    </div>
+                    <div class="pdm-form-actions">
+                        <button class="button button-primary button-large pdm-save-all">
+                            Save Changes
+                        </button>
                     </div>
                 </div>
             </div>
