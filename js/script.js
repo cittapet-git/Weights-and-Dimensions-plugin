@@ -1,42 +1,61 @@
 jQuery(document).ready(function($) {
-    // Configuración del servidor de mediciones
+    // Configuración del modo debug
+    const DEBUG_MODE = true; // Cambiar a false para deshabilitar logs
+
+    // Función helper para logs
+    function debug(...args) {
+        if (DEBUG_MODE) {
+            console.log(...args);
+        }
+    }
+
+    // Función helper para errores
+    function debugError(...args) {
+        if (DEBUG_MODE) {
+            console.error(...args);
+        }
+    }
+
+    // Configuración inicial del servidor que maneja las mediciones
     const MEASUREMENT_SERVER = {
         host: '192.168.1.100',
         endpoints: {
-            weight: '/weight',
-            dimension: '/dimension',
-            ip: '/ip'
+            weight: '/weight',      // Endpoint para obtener peso
+            dimension: '/dimension', // Endpoint para obtener dimensiones
+            ip: '/ip'               // Endpoint para verificar conexión
         }
     };
     
-    const barcodeInput = $('#pdm-barcode-input');
-    const productInfo = $('.pdm-product-info');
-    const suggestions = $('.pdm-suggestions');
-    const spinner = $('.pdm-spinner');
-    
-    let lastKeyTime = 0;
-    let barcodeBuffer = '';
-    const BARCODE_DELAY = 50;
-    let isScanning = false; // Nueva variable para controlar si estamos en proceso de escaneo
+    // Referencias a elementos DOM frecuentemente utilizados
+    const barcodeInput = $('#pdm-barcode-input');    // Input para código de barras
+    const productInfo = $('.pdm-product-info');      // Contenedor de info del producto
+    const suggestions = $('.pdm-suggestions');        // Contenedor de sugerencias
+    const spinner = $('.pdm-spinner');               // Indicador de carga
 
-    // Reemplazar las variables de control de medición secuencial
-    let currentField = null;
-    let isMeasuring = false;
+    // Variables para el manejo del scanner de códigos de barras
+    let lastKeyTime = 0;            // Último tiempo que se presionó una tecla
+    let barcodeBuffer = '';         // Buffer para almacenar el código escaneado
+    const BARCODE_DELAY = 50;       // Delay máximo entre teclas para considerar entrada de scanner
+    let isScanning = false;         // Indica si estamos en proceso de escaneo
 
-    // Variables para control de medición secuencial
-    let currentMeasurement = null;
-    const measurementSequence = ['weight', 'length', 'width', 'height'];
-    let cycleCompleted = false;
+    // Variables para control de medición
+    let currentField = null;        // Campo actualmente seleccionado
+    let isMeasuring = false;        // Indica si hay una medición en curso
 
-    // Al inicio del archivo, después de la configuración del MEASUREMENT_SERVER
+    // Control de secuencia de medición
+    let currentMeasurement = null;  // Medición actual en la secuencia
+    const measurementSequence = ['weight', 'length', 'width', 'height']; // Orden de medición
+    let cycleCompleted = false;     // Indica si se completó el ciclo de mediciones
+
+    // Variable para el intervalo de verificación de conexión
     let connectionCheckInterval;
 
-    // Función para actualizar el estado visual
+    // Función para actualizar el estado visual de la conexión
     function updateConnectionStatus(status, message = '') {
         const statusLight = $('.pdm-status-light');
         const statusText = $('.pdm-status-text');
         
-        console.log('Actualizando estado de conexión:', { status, message });
+        debug('Actualizando estado de conexión:', { status, message });
         
         // Primero removemos todas las clases
         statusLight.removeClass('connected disconnected connecting');
@@ -64,37 +83,37 @@ jQuery(document).ready(function($) {
         }
         
         if (message) {
-            console.log('Mensaje adicional:', message);
+            debug('Mensaje adicional:', message);
         }
     }
 
-    // Modificar la función de verificación de conexión
+    // Función para verificar la conexión con el servidor de mediciones
     async function checkConnection() {
         const currentIp = $('.pdm-current-ip');
         
-        console.log('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host);
+        debug('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host);
         updateConnectionStatus('connecting');
         
         try {
             const response = await fetch(`http://${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.ip}`);
-            console.log('Respuesta del servidor:', response);
+            debug('Respuesta del servidor:', response);
             
             if (response.ok) {
-                console.log('Conexión exitosa al servidor de mediciones');
+                debug('Conexión exitosa al servidor de mediciones');
                 updateConnectionStatus('connected');
                 
                 // Intentar obtener más información del servidor si está disponible
                 try {
                     const data = await response.json();
-                    console.log('Información adicional del servidor:', data);
+                    debug('Información adicional del servidor:', data);
                 } catch (e) {
-                    console.log('No hay información adicional disponible');
+                    debug('No hay información adicional disponible');
                 }
             } else {
                 throw new Error(`Error en la respuesta del servidor: ${response.status}`);
             }
         } catch (error) {
-            console.error('Error de conexión:', {
+            debugError('Error de conexión:', {
                 message: error.message,
                 error: error
             });
@@ -104,7 +123,7 @@ jQuery(document).ready(function($) {
         currentIp.text(MEASUREMENT_SERVER.host);
     }
 
-    // Crear el editor de IP
+    // Función para crear el editor de IP del servidor
     function createIpEditor() {
         const editor = $(`
             <div class="pdm-ip-editor">
@@ -229,7 +248,7 @@ jQuery(document).ready(function($) {
     });
 
     function searchProducts(search, isScanner = false) {
-        console.log('Iniciando búsqueda:', { search, isScanner });
+        debug('Iniciando búsqueda:', { search, isScanner });
         spinner.show();
         suggestions.hide();
         
@@ -242,18 +261,18 @@ jQuery(document).ready(function($) {
                 search: search
             },
             success: function(response) {
-                console.log('Respuesta de búsqueda:', response);
+                debug('Respuesta de búsqueda:', response);
                 spinner.hide();
                 if (response.success && response.data.length > 0) {
                     if (isScanner) {
-                        console.log('Producto encontrado por scanner:', response.data[0]);
+                        debug('Producto encontrado por scanner:', response.data[0]);
                         displayProduct(response.data[0]);
                         barcodeInput.val(response.data[0].sku);
                     } else {
                         displaySuggestions(response.data);
                     }
                 } else {
-                    console.log('No se encontraron productos:', { search, isScanner });
+                    debug('No se encontraron productos:', { search, isScanner });
                     if (isScanner) {
                         alert('Producto no encontrado');
                         productInfo.hide();
@@ -263,7 +282,7 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(error) {
-                console.error('Error en búsqueda:', error);
+                debugError('Error en búsqueda:', error);
                 spinner.hide();
                 alert('Error al buscar productos');
             }
@@ -312,7 +331,7 @@ jQuery(document).ready(function($) {
     
     $(document).on('click', '.pdm-suggestion-item', function() {
         const product = $(this).data('product');
-        console.log('Producto seleccionado de sugerencias:', product);
+        debug('Producto seleccionado de sugerencias:', product);
         if (product) {
             displayProduct(product);
             suggestions.hide();
@@ -328,7 +347,7 @@ jQuery(document).ready(function($) {
     });
     
     function displayProduct(product) {
-        console.log('Mostrando producto:', product);
+        debug('Mostrando producto:', product);
         $('#pdm-product-image').attr('src', product.image);
         $('#pdm-product-title').text(product.title);
         $('#pdm-product-sku').text(product.sku)
@@ -339,7 +358,7 @@ jQuery(document).ready(function($) {
         $('#pdm-height').val(product.height);
         $('#pdm-price').text(product.price);
         
-        console.log('Datos guardados en elementos:', {
+        debug('Datos guardados en elementos:', {
             sku: $('#pdm-product-sku').text(),
             productId: $('#pdm-product-sku').data('product-id'),
             price: $('#pdm-price').text(),
@@ -359,17 +378,18 @@ jQuery(document).ready(function($) {
         
         productInfo.show();
     }
-    
+
+    // Manejador para guardar los cambios en el producto
     $('.pdm-save-all').on('click', function() {
         const $sku = $('#pdm-product-sku');
-        console.log('Estado actual del elemento SKU:', {
+        debug('Estado actual del elemento SKU:', {
             element: $sku,
             text: $sku.text(),
             dataProductId: $sku.data('product-id')
         });
 
         const productId = $sku.data('product-id');
-        console.log('ID del producto a guardar:', productId);
+        debug('ID del producto a guardar:', productId);
 
         const data = {
             action: 'pdm_save_dimensions',
@@ -381,7 +401,7 @@ jQuery(document).ready(function($) {
             height: $('#pdm-height').val()
         };
         
-        console.log('Datos a enviar:', data);
+        debug('Datos a enviar:', data);
         
         // Mostrar indicador de carga
         $(this).addClass('loading').prop('disabled', true);
@@ -391,16 +411,16 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: data,
             success: function(response) {
-                console.log('Respuesta del servidor:', response);
+                debug('Respuesta del servidor:', response);
                 if (response.success) {
                     alert('Datos guardados correctamente');
                 } else {
-                    console.error('Error en respuesta:', response);
+                    debugError('Error en respuesta:', response);
                     alert('Error al guardar los datos: ' + response.data);
                 }
             },
             error: function(xhr, status, error) {
-                console.error('Error en la petición:', {
+                debugError('Error en la petición:', {
                     xhr: xhr,
                     status: status,
                     error: error
@@ -417,16 +437,16 @@ jQuery(document).ready(function($) {
     // Función para obtener el peso de la balanza
     async function getWeight() {
         const weightUrl = `http://${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.weight}`;
-        console.log('Iniciando petición de peso a', weightUrl);
+        debug('Iniciando petición de peso a', weightUrl);
         try {
             const response = await fetch(weightUrl);
-            console.log('Respuesta del servidor de peso:', response);
+            debug('Respuesta del servidor de peso:', response);
             const data = await response.json();
-            console.log('Datos de peso recibidos:', data);
-            console.log('Peso extraído:', data.peso_kg);
+            debug('Datos de peso recibidos:', data);
+            debug('Peso extraído:', data.peso_kg);
             return Number(data.peso_kg).toFixed(2);
         } catch (error) {
-            console.error('Error detallado al obtener el peso:', {
+            debugError('Error detallado al obtener el peso:', {
                 message: error.message,
                 error: error
             });
@@ -437,16 +457,16 @@ jQuery(document).ready(function($) {
     // Función para obtener dimensiones
     async function getDimension() {
         const dimensionUrl = `http://${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.dimension}`;
-        console.log('Iniciando petición de dimensión a', dimensionUrl);
+        debug('Iniciando petición de dimensión a', dimensionUrl);
         try {
             const response = await fetch(dimensionUrl);
-            console.log('Respuesta del servidor de dimensiones:', response);
+            debug('Respuesta del servidor de dimensiones:', response);
             const data = await response.json();
-            console.log('Datos de dimensión recibidos:', data);
-            console.log('Dimensión extraída:', data.dimension_cm);
-            return Number(data.dimension_cm).toFixed(2);
+            debug('Datos de dimensión recibidos:', data);
+            debug('Dimensión extraída:', data.dimension_cm);
+            return data.dimension_cm;
         } catch (error) {
-            console.error('Error detallado al obtener la dimensión:', {
+            debugError('Error detallado al obtener la dimensión:', {
                 message: error.message,
                 error: error
             });
@@ -469,7 +489,7 @@ jQuery(document).ready(function($) {
                 setTimeout(() => startContinuousWeight($input, $measureBtn, $stopBtn), MEASUREMENT_DELAY);
             }
         } catch (error) {
-            console.error('Error en medición continua de peso:', error);
+            debugError('Error en medición continua de peso:', error);
             stopMeasurement($measureBtn, $stopBtn);
             alert(`Error al obtener la medición: ${error.message}`);
         }
@@ -486,7 +506,7 @@ jQuery(document).ready(function($) {
                 setTimeout(() => startContinuousDimension($input, $measureBtn, $stopBtn), MEASUREMENT_DELAY);
             }
         } catch (error) {
-            console.error('Error en medición continua de dimensión:', error);
+            debugError('Error en medición continua de dimensión:', error);
             stopMeasurement($measureBtn, $stopBtn);
             alert(`Error al obtener la medición: ${error.message}`);
         }
@@ -514,7 +534,7 @@ jQuery(document).ready(function($) {
         
         const $stopBtn = $button.nextAll('.stop-measure-btn').first();
         const measureType = $button.data('type');
-        console.log('Iniciando medición para:', measureType);
+        debug('Iniciando medición para:', measureType);
         
         $button.hide();
         $stopBtn.show();
@@ -549,7 +569,7 @@ jQuery(document).ready(function($) {
     function startNextMeasurement() {
         // Si el ciclo está completo, no hacer nada
         if (cycleCompleted) {
-            console.log('Ciclo completado, no se pueden iniciar más mediciones');
+            debug('Ciclo completado, no se pueden iniciar más mediciones');
             return;
         }
 
@@ -581,13 +601,13 @@ jQuery(document).ready(function($) {
 
     // Modificar el manejador de teclas para todo el documento
     $(document).on('keydown', function(e) {
-        // Ignorar el Enter si viene del scanner
+        // Ignorar Enter si viene del scanner
         if (isScanning) return;
 
         // Solo procesar si hay un producto seleccionado
         if (!productInfo.is(':visible')) return;
 
-        // Ignorar eventos si el foco está en un campo de texto (excepto los inputs de medición)
+        // Ignorar eventos si el foco está en un campo de texto no relacionado
         if (e.target.tagName === 'INPUT' && !$(e.target).closest('.pdm-dimensions-form').length) return;
 
         switch (e.key) {
@@ -663,7 +683,7 @@ jQuery(document).ready(function($) {
         // Enfocar el nuevo campo y actualizar visuales
         $(`#pdm-${currentField}`).focus();
         updateFieldVisuals();
-        console.log('Campo activo:', currentField);
+        debug('Campo activo:', currentField);
     }
 
     // Modificar la función updateFieldVisuals para que sea más clara
@@ -674,7 +694,7 @@ jQuery(document).ready(function($) {
         // Agregar resaltado al campo actual si existe
         if (currentField) {
             $(`#pdm-${currentField}`).closest('.pdm-form-row').addClass('active-field');
-            console.log('Actualizando visuales para campo:', currentField);
+            debug('Actualizando visuales para campo:', currentField);
         }
     }
 
