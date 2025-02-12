@@ -10,6 +10,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once plugin_dir_path(__FILE__) . 'logger.php';
+
 // Enqueue necessary scripts and styles
 function pdm_enqueue_scripts($hook)
 {
@@ -57,7 +59,7 @@ function pdm_render_page()
                 </button>
             </div>
         </div>
-        <h1>Product Dimensions Manager</h1>
+
         <div class="pdm-container">
             <div class="pdm-search-section">
                 <h2>Buscar Codigo o Nombre:</h2>
@@ -79,57 +81,73 @@ function pdm_render_page()
                         <h2 id="pdm-product-title"></h2>
                         <p>SKU: <span id="pdm-product-sku"></span></p>
                         <p>Precio: $<span id="pdm-price"></span></p>
+                        <div class="pdm-form-actions">
+                            <button class="button button-primary button-large pdm-save-all">
+                                Save Changes
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="pdm-dimensions-form">
-                    <div class="pdm-form-row" style="margin-bottom: 20px;">
-                        <label style="font-size: 18px; min-width: 100px;">Weight (kg):</label>
-                        <input type="number" id="pdm-weight" step="0.01" style="font-size: 18px; width: 150px; padding: 8px;">
-                        <button type="button" class="button measure-btn" data-type="weight" style="height: 40px; margin-left: 10px;">
-                            <span class="dashicons dashicons-arrow-down-alt"></span>
-                        </button>
-                        <button type="button" class="button stop-measure-btn" style="display: none; height: 40px; margin-left: 10px;">
-                            Detener
-                        </button>
-                    </div>
-                    <div class="pdm-dimensions-group" style="border: 1px solid #ddd; padding: 20px; border-radius: 5px; background: #f9f9f9;">
-                        <h3 style="margin-top: 0; margin-bottom: 20px;">Dimensions (cm)</h3>
-                        <div class="pdm-form-row" style="margin-bottom: 20px;">
-                            <label style="font-size: 18px; min-width: 100px;">Length:</label>
-                            <input type="number" id="pdm-length" step="0.01" style="font-size: 18px; width: 150px; padding: 8px;">
-                            <button type="button" class="button measure-btn" data-type="length" style="height: 40px; margin-left: 10px;">
-                                <span class="dashicons dashicons-arrow-down-alt"></span>
-                            </button>
-                            <button type="button" class="button stop-measure-btn" style="display: none; height: 40px; margin-left: 10px;">
-                                Detener
-                            </button>
-                        </div>
-                        <div class="pdm-form-row" style="margin-bottom: 20px;">
-                            <label style="font-size: 18px; min-width: 100px;">Width:</label>
-                            <input type="number" id="pdm-width" step="0.01" style="font-size: 18px; width: 150px; padding: 8px;">
-                            <button type="button" class="button measure-btn" data-type="width" style="height: 40px; margin-left: 10px;">
-                                <span class="dashicons dashicons-arrow-down-alt"></span>
-                            </button>
-                            <button type="button" class="button stop-measure-btn" style="display: none; height: 40px; margin-left: 10px;">
-                                Detener
-                            </button>
-                        </div>
-                        <div class="pdm-form-row" style="margin-bottom: 20px;">
-                            <label style="font-size: 18px; min-width: 100px;">Height:</label>
-                            <input type="number" id="pdm-height" step="0.01" style="font-size: 18px; width: 150px; padding: 8px;">
-                            <button type="button" class="button measure-btn" data-type="height" style="height: 40px; margin-left: 10px;">
-                                <span class="dashicons dashicons-arrow-down-alt"></span>
-                            </button>
-                            <button type="button" class="button stop-measure-btn" style="display: none; height: 40px; margin-left: 10px;">
-                                Detener
-                            </button>
+                    <div class="pdm-form-row" id="pdm-weight-row">
+                        <label>Weight (kg):</label>
+                        <div class="pdm-input-group">
+                            <input type="number" id="pdm-weight" step="0.01">
+                            <div class="pdm-button-group">
+                                <button type="button" class="button measure-btn" data-type="weight">
+                                    <span class="dashicons dashicons-arrow-down-alt"></span>
+                                </button>
+                                <button type="button" class="button stop-measure-btn" style="display: none;">
+                                    Detener
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div class="pdm-form-actions" style="margin-top: 20px; text-align: right;">
-                        <button class="button button-primary button-large pdm-save-all" style="font-size: 16px; padding: 8px 20px;">
-                            Save Changes
-                        </button>
+                    <div class="pdm-dimensions-group">
+                        <h3>Dimensions (cm)</h3>
+                        <div class="pdm-form-row">
+                            <label>Length:</label>
+                            <div class="pdm-input-group">
+                                <input type="number" id="pdm-length" step="0.01">
+                                <div class="pdm-button-group">
+                                    <button type="button" class="button measure-btn" data-type="length">
+                                        <span class="dashicons dashicons-arrow-down-alt"></span>
+                                    </button>
+                                    <button type="button" class="button stop-measure-btn" style="display: none;">
+                                        Detener
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pdm-form-row">
+                            <label>Width:</label>
+                            <div class="pdm-input-group">
+                                <input type="number" id="pdm-width" step="0.01">
+                                <div class="pdm-button-group">
+                                    <button type="button" class="button measure-btn" data-type="width">
+                                        <span class="dashicons dashicons-arrow-down-alt"></span>
+                                    </button>
+                                    <button type="button" class="button stop-measure-btn" style="display: none;">
+                                        Detener
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pdm-form-row">
+                            <label>Height:</label>
+                            <div class="pdm-input-group">
+                                <input type="number" id="pdm-height" step="0.01">
+                                <div class="pdm-button-group">
+                                    <button type="button" class="button measure-btn" data-type="height">
+                                        <span class="dashicons dashicons-arrow-down-alt"></span>
+                                    </button>
+                                    <button type="button" class="button stop-measure-btn" style="display: none;">
+                                        Detener
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -144,14 +162,16 @@ function pdm_search_product()
     check_ajax_referer('pdm_nonce', 'nonce');
 
     $search = sanitize_text_field($_POST['search']);
+    $search_upper = strtoupper($search); // Convertir a mayúsculas para la búsqueda
 
     $results = array();
 
     try {
-        // Buscar por ID/SKU, código de barras o por título
+        global $wpdb;
+
         if (is_numeric($search)) {
             if (strlen($search) >= 10) {
-                // Búsqueda por código de barras
+                // Búsqueda por código de barras (sin cambios)
                 $args = array(
                     'post_type' => 'product',
                     'posts_per_page' => 10,
@@ -164,64 +184,89 @@ function pdm_search_product()
                     )
                 );
             } else {
-                // Búsqueda por SKU
+                // Búsqueda directa en postmeta para SKU numérico
+                $product_ids = $wpdb->get_col($wpdb->prepare(
+                    "
+                    SELECT post_id 
+                    FROM {$wpdb->postmeta} 
+                    WHERE meta_key = '_sku' 
+                    AND UPPER(meta_value) LIKE %s",
+                    '%' . $wpdb->esc_like($search_upper) . '%'
+                ));
+            }
+        } else {
+            // Búsqueda directa en postmeta para SKU alfanumérico
+            $product_ids = $wpdb->get_col($wpdb->prepare(
+                "
+                SELECT DISTINCT post_id 
+                FROM {$wpdb->postmeta} 
+                WHERE meta_key = '_sku' 
+                AND (
+                    UPPER(meta_value) LIKE %s 
+                    OR UPPER(meta_value) = %s
+                )",
+                '%' . $wpdb->esc_like($search_upper) . '%',
+                $search_upper
+            ));
+
+            // Si no hay resultados por SKU, buscar por título
+            if (empty($product_ids)) {
                 $args = array(
                     'post_type' => 'product',
                     'posts_per_page' => 10,
-                    'meta_query' => array(
-                        array(
-                            'key' => '_sku',
-                            'value' => $search,
-                            'compare' => 'LIKE'
-                        )
-                    )
+                    'orderby' => 'title',
+                    'order' => 'ASC',
+                    's' => $search
                 );
             }
-        } else {
-            // Búsqueda por título
+        }
+
+        // Si tenemos IDs de productos de la búsqueda directa
+        if (!empty($product_ids)) {
             $args = array(
                 'post_type' => 'product',
+                'post__in' => $product_ids,
                 'posts_per_page' => 10,
-                'orderby' => 'title',
-                'order' => 'ASC',
-                's' => $search
+                'orderby' => 'post__in'
             );
         }
 
-        $query = new WP_Query($args);
+        if (isset($args)) {
+            $query = new WP_Query($args);
 
-        if ($query->have_posts()) {
-            while ($query->have_posts()) {
-                $query->the_post();
-                $product = wc_get_product(get_the_ID());
-                if ($product) {
-                    $dimensions = wc_format_dimensions($product->get_dimensions(false)); // Get raw dimensions
-                    $dimensions_array = array_map('floatval', $product->get_dimensions(false));
+            if ($query->have_posts()) {
+                while ($query->have_posts()) {
+                    $query->the_post();
+                    $product = wc_get_product(get_the_ID());
+                    if ($product) {
+                        $dimensions = wc_format_dimensions($product->get_dimensions(false));
+                        $dimensions_array = array_map('floatval', $product->get_dimensions(false));
 
-                    $results[] = array(
-                        'id' => $product->get_id(),
-                        'title' => $product->get_name(),
-                        'sku' => $product->get_sku(),
-                        'image' => get_the_post_thumbnail_url(get_the_ID(), 'thumbnail'),
-                        'meta' => sprintf(
-                            'SKU: %s | Precio: %s',
-                            $product->get_sku(),
-                            wc_price($product->get_price())
-                        ),
-                        'weight' => $product->get_weight(),
-                        'length' => $dimensions_array['length'] ?? '',
-                        'width' => $dimensions_array['width'] ?? '',
-                        'height' => $dimensions_array['height'] ?? '',
-                        'price' => $product->get_price()
-                    );
+                        $results[] = array(
+                            'id' => $product->get_id(),
+                            'title' => $product->get_name(),
+                            'sku' => $product->get_sku(),
+                            'image' => get_the_post_thumbnail_url(get_the_ID(), 'thumbnail'),
+                            'meta' => sprintf(
+                                'SKU: %s | Precio: %s',
+                                $product->get_sku(),
+                                wc_price($product->get_price())
+                            ),
+                            'weight' => $product->get_weight(),
+                            'length' => $dimensions_array['length'] ?? '',
+                            'width' => $dimensions_array['width'] ?? '',
+                            'height' => $dimensions_array['height'] ?? '',
+                            'price' => $product->get_price()
+                        );
+                    }
                 }
+                wp_reset_postdata();
             }
-            wp_reset_postdata();
         }
 
         wp_send_json_success($results);
     } catch (Exception $e) {
-        wp_send_json_error('Error al buscar productos');
+        wp_send_json_error('Error al buscar productos: ' . $e->getMessage());
     }
 }
 add_action('wp_ajax_pdm_search_product', 'pdm_search_product');
@@ -249,6 +294,32 @@ function pdm_save_dimensions()
             throw new Exception('Producto no encontrado');
         }
 
+        // Get original values to determine what changed
+        $original_weight = floatval($product->get_weight());
+        $original_length = floatval($product->get_length());
+        $original_width = floatval($product->get_width());
+        $original_height = floatval($product->get_height());
+
+        // Verificar si hubo cambios
+        $weight_changed = $weight !== $original_weight;
+        $dimensions_changed = $length !== $original_length ||
+            $width !== $original_width ||
+            $height !== $original_height;
+
+        // Si no hay cambios, retornar éxito sin hacer nada
+        if (!$weight_changed && !$dimensions_changed) {
+            wp_send_json_success([
+                'message' => 'No hay cambios que guardar',
+                'weight' => $weight,
+                'dimensions' => [
+                    'length' => $length,
+                    'width' => $width,
+                    'height' => $height
+                ]
+            ]);
+            return;
+        }
+
         // Actualizar dimensiones y peso
         $product->set_weight($weight);
         $product->set_length($length);
@@ -257,6 +328,39 @@ function pdm_save_dimensions()
 
         // Guardar los cambios
         $product->save();
+
+        // Determine what changed and log accordingly
+        $logger = new Logger();
+        $sku = $product->get_sku();
+
+        // Determine what action to log based on what changed
+        if (
+            $original_weight === 0 && $original_length === 0 &&
+            $original_width === 0 && $original_height === 0
+        ) {
+            // If all original values were zero, this is a creation
+            $action = 'weight_dimensions_created';
+        } else if ($weight_changed && $dimensions_changed) {
+            // Both weight and dimensions changed
+            $action = 'weight_dimensions_updated';
+        } else if ($weight_changed) {
+            // Only weight changed
+            $action = 'weight_updated';
+        } else {
+            // Only dimensions changed
+            $action = 'dimensions_updated';
+        }
+
+        // Log the action with all values
+        $logger->log_action(
+            $product_id,
+            $action,
+            $sku,
+            $weight,
+            $length,
+            $width,
+            $height
+        );
 
         wp_send_json_success([
             'message' => 'Datos actualizados correctamente',

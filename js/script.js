@@ -510,10 +510,10 @@ jQuery(document).ready(function($) {
     // Modificar el manejador de clicks en los botones de medición
     $('.measure-btn').on('click', function() {
         const $button = $(this);
-        const $input = $button.prev('input');
+        const $input = $button.closest('.pdm-input-group').find('input');
+        
         const $stopBtn = $button.nextAll('.stop-measure-btn').first();
         const measureType = $button.data('type');
-        
         console.log('Iniciando medición para:', measureType);
         
         $button.hide();
@@ -579,7 +579,7 @@ jQuery(document).ready(function($) {
         isMeasuring = true;
     }
 
-    // Manejador de teclas para todo el documento
+    // Modificar el manejador de teclas para todo el documento
     $(document).on('keydown', function(e) {
         // Ignorar el Enter si viene del scanner
         if (isScanning) return;
@@ -587,19 +587,26 @@ jQuery(document).ready(function($) {
         // Solo procesar si hay un producto seleccionado
         if (!productInfo.is(':visible')) return;
 
+        // Ignorar eventos si el foco está en un campo de texto (excepto los inputs de medición)
+        if (e.target.tagName === 'INPUT' && !$(e.target).closest('.pdm-dimensions-form').length) return;
+
         switch (e.key) {
             case ' ': // Espacio
                 e.preventDefault();
                 if (!currentField) {
-                    switchField('down'); // Inicializar con el primer campo
+                    currentField = 'weight';
+                    updateFieldVisuals();
                     return;
                 }
                 
                 // Toggle medición del campo actual
+                const $currentMeasureBtn = $(`.measure-btn[data-type="${currentField}"]`);
+                const $currentStopBtn = $currentMeasureBtn.nextAll('.stop-measure-btn').first();
+                
                 if (isMeasuring) {
-                    $(`.stop-measure-btn:visible`).click();
+                    $currentStopBtn.click();
                 } else {
-                    $(`.measure-btn[data-type="${currentField}"]`).click();
+                    $currentMeasureBtn.click();
                 }
                 break;
                 
@@ -625,53 +632,54 @@ jQuery(document).ready(function($) {
         }
     });
 
-    // Función para cambiar el campo activo
+    // Modificar la función switchField para que sea más robusta
     function switchField(direction) {
         const fields = ['weight', 'length', 'width', 'height'];
         
         // Si no hay campo activo, empezar con weight
         if (!currentField) {
             currentField = 'weight';
-            $('#pdm-weight').focus().click();
-            console.log('Campo inicial seleccionado:', currentField);
-            return;
-        }
-        
-        // Encontrar el índice actual
-        const currentIndex = fields.indexOf(currentField);
-        let newIndex;
-        
-        // Calcular nuevo índice basado en la dirección
-        if (direction === 'up') {
-            newIndex = currentIndex <= 0 ? fields.length - 1 : currentIndex - 1;
         } else {
-            newIndex = currentIndex >= fields.length - 1 ? 0 : currentIndex + 1;
+            // Encontrar el índice actual
+            const currentIndex = fields.indexOf(currentField);
+            let newIndex;
+            
+            // Calcular nuevo índice basado en la dirección
+            if (direction === 'up') {
+                newIndex = currentIndex <= 0 ? fields.length - 1 : currentIndex - 1;
+            } else {
+                newIndex = currentIndex >= fields.length - 1 ? 0 : currentIndex + 1;
+            }
+            
+            // Detener medición actual si está activa
+            if (isMeasuring) {
+                $('.stop-measure-btn:visible').click();
+            }
+            
+            // Actualizar campo actual
+            currentField = fields[newIndex];
         }
         
-        // Detener medición actual si está activa
-        if (isMeasuring) {
-            $('.stop-measure-btn:visible').click();
-        }
-        
-        // Actualizar campo actual
-        currentField = fields[newIndex];
-        $(`#pdm-${currentField}`).focus().click();
-        console.log('Cambiando a campo:', currentField);
+        // Enfocar el nuevo campo y actualizar visuales
+        $(`#pdm-${currentField}`).focus();
+        updateFieldVisuals();
+        console.log('Campo activo:', currentField);
     }
 
-    // Agregar estilo visual para el campo activo
+    // Modificar la función updateFieldVisuals para que sea más clara
     function updateFieldVisuals() {
         // Remover resaltado de todos los campos
         $('.pdm-form-row').removeClass('active-field');
         
-        // Agregar resaltado al campo actual
+        // Agregar resaltado al campo actual si existe
         if (currentField) {
             $(`#pdm-${currentField}`).closest('.pdm-form-row').addClass('active-field');
+            console.log('Actualizando visuales para campo:', currentField);
         }
     }
 
-    // Llamar a updateFieldVisuals cuando cambie el campo activo
-    $(document).on('click', '.pdm-form-row input', function() {
+    // Agregar manejador de click para los inputs
+    $('.pdm-dimensions-form input').on('click', function() {
         const fieldId = $(this).attr('id').replace('pdm-', '');
         currentField = fieldId;
         updateFieldVisuals();
