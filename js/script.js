@@ -90,43 +90,31 @@ jQuery(document).ready(function($) {
 
     // Función para verificar la conexión con el servidor de mediciones
     async function checkConnection() {
-        const currentIp = MEASUREMENT_SERVER.host;
-        
-        debug('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host)
-        //+MEASUREMENT_SERVER.endpoints.ip;
+        debug('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host);
         updateConnectionStatus('connecting');
         
-        try {
-            ;
-            
-            const response = await fetch(`${MEASUREMENT_SERVER.host}`);
-            //{MEASUREMENT_SERVER.endpoints.ip}
-            
-            debug('Respuesta del servidor:', response)
-
-            if (response.ok) {
-                debug('Conexión exitosa al servidor de mediciones');
-                updateConnectionStatus('connected');
-                
-                // Intentar obtener más información del servidor si está disponible
-                try {
-                    const data = await response.json();
-                    debug('Información adicional del servidor:', data);
-                } catch (e) {
-                    debug('No hay información adicional disponible');
-                }
-            } else {
-                throw new Error(`Error en la respuesta del servidor: ${response.status}`);
-            }
-        } catch (error) {
-            debugError('Error de conexión:', {
-                message: error.message,
-                error: error
-            });
-            updateConnectionStatus('disconnected', error.message);
-        }
+        const url = `${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.ip}`;
+        debug('URL completa:', url);
         
-        //currentIp.text(MEASUREMENT_SERVER.host);
+        try {
+            const response = await fetch(url);
+            debug('Respuesta recibida:', response);
+            const data = await response.json();
+            debug('Datos recibidos:', data);
+            
+            updateConnectionStatus('connected');
+            
+        } catch (error) {
+            const errorDetails = {
+                message: error.message,
+                url: url,
+                serverHost: MEASUREMENT_SERVER.host,
+                endpoint: MEASUREMENT_SERVER.endpoints.ip
+            };
+            debugError('Error de conexión:', errorDetails);
+            updateConnectionStatus('disconnected', error.message);
+            throw error;
+        }
     }
 
     // Función para crear el editor de IP del servidor
@@ -190,6 +178,7 @@ jQuery(document).ready(function($) {
             
             if (newIp) {
                 MEASUREMENT_SERVER.host = newIp;
+                debug('IP actualizada a:', newIp);
                 $('.pdm-current-ip').text(newIp);
                 $ipInfo.removeClass('editing');
                 
@@ -223,7 +212,9 @@ jQuery(document).ready(function($) {
     // Función para iniciar la verificación periódica
     function startConnectionCheck() {
         checkConnection(); // Verificación inicial
-        connectionCheckInterval = setInterval(checkConnection, 30000); // Verificar cada 30 segundos
+        
+        // Usar una referencia a función en lugar de una cadena
+        connectionCheckInterval = setInterval(checkConnection, 30000);
     }
 
     // Escuchar eventos de teclado en todo el documento
@@ -540,6 +531,7 @@ jQuery(document).ready(function($) {
             
             // Programar la siguiente medición si el intervalo sigue activo
             if (measurementInterval) {
+                // Usar una función de flecha directamente
                 setTimeout(() => startContinuousDimension($input, $measureBtn, $stopBtn), MEASUREMENT_DELAY);
             }
         } catch (error) {
