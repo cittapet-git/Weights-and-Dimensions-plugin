@@ -59,7 +59,7 @@ function pdm_render_page()
                         <span class="pdm-status-text">Conectado</span>
                         <div class="pdm-status-light" title="Estado de conexión"></div>
                         <div class="pdm-ip-info" style="display: none;">
-                            <span class="pdm-current-ip">192.168.1.100</span>
+                            <span class="pdm-current-ip"></span>
                             <button class="pdm-edit-ip" title="Editar IP">
                                 <span class="dashicons dashicons-edit"></span>
                             </button>

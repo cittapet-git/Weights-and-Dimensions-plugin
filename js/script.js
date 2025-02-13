@@ -1,6 +1,7 @@
+const DEBUG_MODE = true;
 jQuery(document).ready(function($) {
     // Configuración del modo debug
-    const DEBUG_MODE = true; // Cambiar a false para deshabilitar logs
+     // Cambiar a false para deshabilitar logs
 
     // Función helper para logs
     function debug(...args) {
@@ -18,11 +19,11 @@ jQuery(document).ready(function($) {
 
     // Configuración inicial del servidor que maneja las mediciones
     const MEASUREMENT_SERVER = {
-        host: '192.168.1.100',
+        host: 'https://mesapesoymedida.cittapet.com',
         endpoints: {
-            weight: '/weight',      // Endpoint para obtener peso
-            dimension: '/dimension', // Endpoint para obtener dimensiones
-            ip: '/ip'               // Endpoint para verificar conexión
+            weight: '/weight.php',      // Endpoint para obtener peso
+            dimension: '/dimensions.php', // Endpoint para obtener dimensiones
+            ip:'/ip.php'               // Endpoint para verificar conexión
         }
     };
     
@@ -89,15 +90,20 @@ jQuery(document).ready(function($) {
 
     // Función para verificar la conexión con el servidor de mediciones
     async function checkConnection() {
-        const currentIp = $('.pdm-current-ip');
+        const currentIp = MEASUREMENT_SERVER.host;
         
-        debug('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host);
+        debug('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host)
+        //+MEASUREMENT_SERVER.endpoints.ip;
         updateConnectionStatus('connecting');
         
         try {
-            const response = await fetch(`http://${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.ip}`);
-            debug('Respuesta del servidor:', response);
+            ;
             
+            const response = await fetch(`${MEASUREMENT_SERVER.host}`);
+            //{MEASUREMENT_SERVER.endpoints.ip}
+            
+            debug('Respuesta del servidor:', response)
+
             if (response.ok) {
                 debug('Conexión exitosa al servidor de mediciones');
                 updateConnectionStatus('connected');
@@ -120,11 +126,13 @@ jQuery(document).ready(function($) {
             updateConnectionStatus('disconnected', error.message);
         }
         
-        currentIp.text(MEASUREMENT_SERVER.host);
+        //currentIp.text(MEASUREMENT_SERVER.host);
     }
 
     // Función para crear el editor de IP del servidor
     function createIpEditor() {
+        debug('Creando editor de IP con host:', MEASUREMENT_SERVER.host);
+        
         const editor = $(`
             <div class="pdm-ip-editor">
                 <input type="text" class="pdm-ip-input" value="${MEASUREMENT_SERVER.host}">
@@ -147,20 +155,32 @@ jQuery(document).ready(function($) {
             $ipInfo.toggle();
             
             // Ocultar el editor si está visible
-            $('.pdm-ip-editor').removeClass('active');
+            $('.pdm-ip-editor').removeClass('active')
+            $('.pdm-current-ip').val(MEASUREMENT_SERVER.host);
+
         });
         
         // Mostrar editor de IP
         $('.pdm-edit-ip').on('click', function(e) {
             e.stopPropagation();
-            $('.pdm-ip-editor').show();
-                const $ipInfo = $('.pdm-ip-info');
-                const $input = $('.pdm-ip-input');
-                
-                $ipInfo.addClass('editing');
-                $input.val($('.pdm-current-ip').text()).focus();
-                $('.pdm-save-ip').show();
-                $('.pdm-cancel-ip').show();
+            const $ipInfo = $('.pdm-ip-info');
+            const $input = $('.pdm-ip-input');
+            const $editor = $('.pdm-ip-editor');
+            
+            debug('Abriendo editor de IP');
+            
+            // Mostrar el editor
+            $editor.show();
+            
+            // Establecer el valor actual del servidor en el input
+            $input.val(MEASUREMENT_SERVER.host);
+            debug('Valor establecido en input:', MEASUREMENT_SERVER.host);
+            
+            // Actualizar clases y mostrar botones
+            $ipInfo.addClass('editing');
+            $input.focus();
+            $('.pdm-save-ip').show();
+            $('.pdm-cancel-ip').show();
         });
         
         // Guardar IP
@@ -436,15 +456,19 @@ jQuery(document).ready(function($) {
 
     // Función para obtener el peso de la balanza
     async function getWeight() {
-        const weightUrl = `http://${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.weight}`;
+        const weightUrl = `${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.weight}`;
         debug('Iniciando petición de peso a', weightUrl);
         try {
             const response = await fetch(weightUrl);
             debug('Respuesta del servidor de peso:', response);
             const data = await response.json();
             debug('Datos de peso recibidos:', data);
-            debug('Peso extraído:', data.peso_kg);
-            return Number(data.peso_kg).toFixed(2);
+            
+            // Extraer el valor y formatearlo a 2 decimales
+            // Asumiendo que la respuesta del peso tiene un formato similar
+            const weight = Number(data.peso_kg || data.weight || data.value).toFixed(2);
+            debug('Peso formateado:', weight);
+            return weight;
         } catch (error) {
             debugError('Error detallado al obtener el peso:', {
                 message: error.message,
@@ -456,15 +480,18 @@ jQuery(document).ready(function($) {
 
     // Función para obtener dimensiones
     async function getDimension() {
-        const dimensionUrl = `http://${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.dimension}`;
+        const dimensionUrl = `${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.dimension}`;
         debug('Iniciando petición de dimensión a', dimensionUrl);
         try {
             const response = await fetch(dimensionUrl);
             debug('Respuesta del servidor de dimensiones:', response);
             const data = await response.json();
             debug('Datos de dimensión recibidos:', data);
-            debug('Dimensión extraída:', data.dimension_cm);
-            return data.dimension_cm;
+            
+            // Extraer el valor y formatearlo a 2 decimales
+            const dimension = Number(data.dimension_cm).toFixed(2);
+            debug('Dimensión formateada:', dimension);
+            return dimension;
         } catch (error) {
             debugError('Error detallado al obtener la dimensión:', {
                 message: error.message,
@@ -476,13 +503,18 @@ jQuery(document).ready(function($) {
 
     // Variables para controlar las mediciones continuas
     let measurementInterval = null;
-    const MEASUREMENT_DELAY = 250; // 250ms entre mediciones
+    const MEASUREMENT_DELAY = 400; // 250ms entre mediciones
 
     // Función modificada para obtener el peso continuamente
     async function startContinuousWeight($input, $measureBtn, $stopBtn) {
         try {
             const weight = await getWeight();
-            $input.val(weight);
+            if (weight && !isNaN(weight)) {
+                $input.val(weight);
+                debug('Peso actualizado en input:', weight);
+            } else {
+                debug('Peso inválido recibido:', weight);
+            }
             
             // Programar la siguiente medición si el intervalo sigue activo
             if (measurementInterval) {
@@ -499,7 +531,12 @@ jQuery(document).ready(function($) {
     async function startContinuousDimension($input, $measureBtn, $stopBtn) {
         try {
             const dimension = await getDimension();
-            $input.val(dimension);
+            if (dimension && !isNaN(dimension)) {
+                $input.val(dimension);
+                debug('Dimensión actualizada en input:', dimension);
+            } else {
+                debug('Dimensión inválida recibida:', dimension);
+            }
             
             // Programar la siguiente medición si el intervalo sigue activo
             if (measurementInterval) {
