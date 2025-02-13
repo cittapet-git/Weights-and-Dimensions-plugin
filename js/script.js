@@ -19,7 +19,7 @@ jQuery(document).ready(function($) {
 
     // Configuración inicial del servidor que maneja las mediciones
     const MEASUREMENT_SERVER = {
-        host: 'https://mesapesoymedida.cittapet.com',
+        host: '',
         endpoints: {
             weight: '/weight.php',      // Endpoint para obtener peso
             dimension: '/dimensions.php', // Endpoint para obtener dimensiones
@@ -62,35 +62,42 @@ jQuery(document).ready(function($) {
         statusLight.removeClass('connected disconnected connecting');
         statusText.removeClass('connected disconnected connecting');
         
+        let displayMessage = '';
         switch (status) {
             case 'connecting':
-                statusText.text('Conectando...')
+                displayMessage = message || 'Conectando...';
+                statusText.text(displayMessage)
                          .addClass('connecting');
                 statusLight.addClass('connecting')
                           .css('background-color', '#f0ad4e');
                 break;
             case 'connected':
-                statusText.text('Conectado')
+                displayMessage = message || 'Conectado';
+                statusText.text(displayMessage)
                          .addClass('connected');
                 statusLight.addClass('connected')
                           .css('background-color', '#5cb85c');
                 break;
             case 'disconnected':
-                statusText.text('Sin conexión')
+                displayMessage = message || 'Sin conexión';
+                statusText.text(displayMessage)
                          .addClass('disconnected');
                 statusLight.addClass('disconnected')
                           .css('background-color', '#d9534f');
                 break;
         }
         
-        if (message) {
-            debug('Mensaje adicional:', message);
+        if (DEBUG_MODE) {
+            debug('Estado de conexión:', {
+                status: status,
+                message: displayMessage
+            });
         }
     }
 
     // Función para verificar la conexión con el servidor de mediciones
     async function checkConnection() {
-        debug('Iniciando verificación de conexión con:', MEASUREMENT_SERVER.host);
+        debug('Verificando conexión:', MEASUREMENT_SERVER.host);
         updateConnectionStatus('connecting');
         
         const url = `${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.ip}`;
@@ -98,20 +105,26 @@ jQuery(document).ready(function($) {
         
         try {
             const response = await fetch(url);
-            debug('Respuesta recibida:', response);
-            const data = await response.json();
-            debug('Datos recibidos:', data);
             
-            updateConnectionStatus('connected');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Verificar que la respuesta contiene una IP
+            if (data && data.ip) {
+                updateConnectionStatus('connected');
+            } else {
+                updateConnectionStatus('disconnected', 'Arduino no responde correctamente');
+                throw new Error('Respuesta del Arduino no contiene IP');
+            }
             
         } catch (error) {
-            const errorDetails = {
+            debugError('Error de conexión:', {
                 message: error.message,
-                url: url,
-                serverHost: MEASUREMENT_SERVER.host,
-                endpoint: MEASUREMENT_SERVER.endpoints.ip
-            };
-            debugError('Error de conexión:', errorDetails);
+                url: url
+            });
             updateConnectionStatus('disconnected', error.message);
             throw error;
         }
@@ -119,13 +132,9 @@ jQuery(document).ready(function($) {
 
     // Función para crear el editor de IP del servidor
     function createIpEditor() {
-        debug('Creando editor de IP con host:', MEASUREMENT_SERVER.host);
-        
         const editor = $(`
             <div class="pdm-ip-editor">
-                <input type="text" class="pdm-ip-input" value="${MEASUREMENT_SERVER.host}">
-                <button class="button button-primary pdm-save-ip" style='display: none;'>Guardar</button>
-                <button class="button pdm-cancel-ip" style='display: none;'>Cancelar</button>
+                <div class="pdm-ip-suggestions"></div>
             </div>
         `);
         
@@ -151,24 +160,31 @@ jQuery(document).ready(function($) {
         // Mostrar editor de IP
         $('.pdm-edit-ip').on('click', function(e) {
             e.stopPropagation();
-            const $ipInfo = $('.pdm-ip-info');
-            const $input = $('.pdm-ip-input');
             const $editor = $('.pdm-ip-editor');
+            const $suggestions = $('.pdm-ip-suggestions');
             
-            debug('Abriendo editor de IP');
-            
-            // Mostrar el editor
+            $suggestions.html('<div class="pdm-loading">Cargando...</div>');
             $editor.show();
             
-            // Establecer el valor actual del servidor en el input
-            $input.val(MEASUREMENT_SERVER.host);
-            debug('Valor establecido en input:', MEASUREMENT_SERVER.host);
-            
-            // Actualizar clases y mostrar botones
-            $ipInfo.addClass('editing');
-            $input.focus();
-            $('.pdm-save-ip').show();
-            $('.pdm-cancel-ip').show();
+            // Solicitar IPs disponibles
+            $.ajax({
+                url: pdm_ajax.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pdm_get_ips',
+                    nonce: pdm_ajax.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        displayIpSuggestions(response.data);
+                    } else {
+                        $suggestions.html('<div class="pdm-error">Error al cargar IPs disponibles</div>');
+                    }
+                },
+                error: function() {
+                    $suggestions.html('<div class="pdm-error">Error de conexión</div>');
+                }
+            });
         });
         
         // Guardar IP
@@ -734,7 +750,77 @@ jQuery(document).ready(function($) {
         updateFieldVisuals();
     });
 
-    // Inicializar el indicador de conexión
-    initConnectionIndicator();
-    startConnectionCheck();
+    // Función para mostrar las sugerencias de IP
+    function displayIpSuggestions(ips) {
+        const $suggestions = $('.pdm-ip-suggestions');
+        $suggestions.empty();
+        
+        ips.forEach(ip => {
+            const item = $(`
+                <div class="pdm-ip-suggestion-item" data-ip="${ip.ip}">
+                    <div class="pdm-ip-suggestion-info">
+                        <div class="pdm-ip-suggestion-name">${ip.name}</div>
+                        <div class="pdm-ip-suggestion-address">${ip.ip}</div>
+                    </div>
+                </div>
+            `);
+            
+            $suggestions.append(item);
+        });
+    }
+
+    // Manejar la selección de IP
+    $(document).on('click', '.pdm-ip-suggestion-item', function() {
+        const newIp = $(this).data('ip');
+        const ipName = $(this).find('.pdm-ip-suggestion-name').text();
+        
+        if (newIp) {
+            MEASUREMENT_SERVER.host = newIp;
+            debug('IP actualizada:', newIp);
+            $('.pdm-current-ip').text(ipName);
+            $('.pdm-ip-editor').hide();
+            
+            // Reiniciar verificación de conexión
+            clearInterval(connectionCheckInterval);
+            checkConnection();
+            startConnectionCheck();
+        }
+    });
+
+    // Función para obtener la IP inicial
+    async function initializeHost() {
+        updateConnectionStatus('disconnected', 'Iniciando...'); // Estado inicial
+        
+        try {
+            const response = await $.ajax({
+                url: pdm_ajax.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'pdm_get_ips',
+                    nonce: pdm_ajax.nonce
+                }
+            });
+
+            if (response.success && response.data.length > 0) {
+                const firstIp = response.data[0];
+                MEASUREMENT_SERVER.host = firstIp.ip;
+                $('.pdm-current-ip').text(firstIp.name);
+                
+                debug('Host inicial:', firstIp.ip);
+                
+                // Iniciar la verificación de conexión después de establecer el host
+                initConnectionIndicator();
+                updateConnectionStatus('connecting', 'Verificando conexión...'); // Mostrar que está intentando conectar
+                startConnectionCheck();
+            } else {
+                debugError('No hay IPs disponibles');
+                updateConnectionStatus('disconnected', 'No hay IPs disponibles');
+            }
+        } catch (error) {
+            debugError('Error al obtener IPs iniciales:', error);
+            updateConnectionStatus('disconnected', 'Error al obtener IPs');
+        }
+    }
+
+    initializeHost();
 }); 

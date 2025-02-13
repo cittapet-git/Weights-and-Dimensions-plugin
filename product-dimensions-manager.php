@@ -11,6 +11,7 @@ if (!defined('ABSPATH')) {
 }
 
 require_once plugin_dir_path(__FILE__) . 'logger.php';
+require_once plugin_dir_path(__FILE__) . 'ip_arduinos.php';
 
 // Enqueue necessary scripts and styles
 function pdm_enqueue_scripts($hook)
@@ -56,8 +57,8 @@ function pdm_render_page()
                 <div class="pdm-search-header">
                     <h2>Buscar Codigo o Nombre:</h2>
                     <div class="pdm-connection-indicator">
-                        <span class="pdm-status-text">Conectado</span>
-                        <div class="pdm-status-light" title="Estado de conexión"></div>
+                        <span class="pdm-status-text disconnected">Sin conexión</span>
+                        <div class="pdm-status-light disconnected" title="Estado de conexión"></div>
                         <div class="pdm-ip-info" style="display: none;">
                             <span class="pdm-current-ip"></span>
                             <button class="pdm-edit-ip" title="Editar IP">
@@ -382,3 +383,16 @@ function pdm_save_dimensions()
     }
 }
 add_action('wp_ajax_pdm_save_dimensions', 'pdm_save_dimensions');
+
+// Agregar después de los otros add_action
+add_action('wp_ajax_pdm_get_ips', 'pdm_get_available_ips');
+
+function pdm_get_available_ips()
+{
+    check_ajax_referer('pdm_nonce', 'nonce');
+
+    $ip_manager = new IP_Arduinos();
+    $available_ips = $ip_manager->get_available_ips();
+
+    wp_send_json_success($available_ips);
+}
