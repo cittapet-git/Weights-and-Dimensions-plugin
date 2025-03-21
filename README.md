@@ -2,6 +2,15 @@
 
 A WordPress plugin for managing product weights and dimensions with Arduino integration.
 
+## DETALLES IMPORTANTES POR SEBAS
+
+El plugin esta funcionado coorectamente desde la implementacion en produccion por medio de la conexion remota, se hace una llamada al url que creo emanuele que se conecta al arduino, basicamente es un filtro.
+
+Solo funciona el local al estar en la oficina claramente, sino hay error de CORS.
+
+Utiliza los productos de woocommerce.
+Se pueden arreglar los estilos con css important Ross, hazlo si quieres.
+
 ## Description
 
 This plugin allows employees to search for products by barcode or name and manage their weights and dimensions. It connects to Arduino devices that provide real-time weight and dimension measurements.
