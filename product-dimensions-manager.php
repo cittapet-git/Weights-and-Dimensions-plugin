@@ -10,7 +10,6 @@ if (!defined("ABSPATH")) {
     exit();
 }
 
-require_once plugin_dir_path(__FILE__) . "logger.php";
 require_once plugin_dir_path(__FILE__) . "ip_arduinos.php";
 
 // Enqueue necessary scripts and styles
@@ -22,10 +21,26 @@ function pdm_enqueue_scripts($hook)
     }
 
     wp_enqueue_style("pdm-styles", plugins_url("css/style.css", __FILE__));
+    
+    // Enqueue SweetAlert2
+    wp_enqueue_style(
+        "sweetalert2-css",
+        "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css",
+        [],
+        "11"
+    );
+    wp_enqueue_script(
+        "sweetalert2-js",
+        "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js",
+        [],
+        "11",
+        true
+    );
+    
     wp_enqueue_script(
         "pdm-script",
         plugins_url("js/script.js", __FILE__),
-        ["jquery"],
+        ["jquery", "sweetalert2-js"],
         "1.0",
         true,
     );
@@ -79,6 +94,9 @@ function pdm_render_page()
                     <input type="text"
                         id="pdm-barcode-input"
                         placeholder="Ingrese código o nombre del producto...">
+                    <button type="button" class="button button-primary" id="pdm-search-btn" title="Buscar producto directamente">
+                        <span class="dashicons dashicons-search"></span>
+                    </button>
                     <div class="pdm-spinner"></div>
                 </div>
                 <div class="pdm-suggestions"></div>
@@ -172,137 +190,227 @@ function pdm_render_page()
 // AJAX handler for barcode search
 function pdm_search_product()
 {
+    error_log(
+        "[PDM] Search product request - Search term: " .
+            sanitize_text_field($_POST["search"] ?? ""),
+    );
     check_ajax_referer("pdm_nonce", "nonce");
 
     $search = sanitize_text_field($_POST["search"]);
-    $search_upper = strtoupper($search); // Convertir a mayúsculas para la búsqueda
-
+    $is_direct_search =
+        isset($_POST["direct_search"]) && $_POST["direct_search"] === "true";
     $results = [];
 
     try {
-        global $wpdb;
-
-        if (is_numeric($search)) {
-            if (strlen($search) >= 10) {
-                // Búsqueda por código de barras (sin cambios)
-                $args = [
-                    "post_type" => "product",
-                    "posts_per_page" => 10,
-                    "meta_query" => [
-                        [
-                            "key" => "_global_unique_id",
-                            "value" => $search,
-                            "compare" => "=",
-                        ],
-                    ],
-                ];
-            } else {
-                // Búsqueda directa en postmeta para SKU numérico
-                $product_ids = $wpdb->get_col(
-                    $wpdb->prepare(
-                        "
-                    SELECT post_id
-                    FROM {$wpdb->postmeta}
-                    WHERE meta_key = '_sku'
-                    AND UPPER(meta_value) LIKE %s",
-                        "%" . $wpdb->esc_like($search_upper) . "%",
-                    ),
-                );
-            }
-        } else {
-            // Búsqueda directa en postmeta para SKU alfanumérico
-            $product_ids = $wpdb->get_col(
-                $wpdb->prepare(
-                    "
-                SELECT DISTINCT post_id
-                FROM {$wpdb->postmeta}
-                WHERE meta_key = '_sku'
-                AND (
-                    UPPER(meta_value) LIKE %s
-                    OR UPPER(meta_value) = %s
-                )",
-                    "%" . $wpdb->esc_like($search_upper) . "%",
-                    $search_upper,
-                ),
-            );
-
-            // Si no hay resultados por SKU, buscar por título
-            if (empty($product_ids)) {
-                $args = [
-                    "post_type" => "product",
-                    "posts_per_page" => 10,
-                    "orderby" => "title",
-                    "order" => "ASC",
-                    "s" => $search,
-                ];
+        // For direct search, prioritize exact matches and return first match immediately
+        if ($is_direct_search) {
+            $product = pdm_find_exact_product($search);
+            if ($product) {
+                $results = [pdm_format_product_result($product)];
+                error_log("[PDM] Direct search success - Found exact match");
+                wp_send_json_success($results);
+                return;
             }
         }
 
-        // Si tenemos IDs de productos de la búsqueda directa
-        if (!empty($product_ids)) {
-            $args = [
-                "post_type" => "product",
-                "post__in" => $product_ids,
-                "posts_per_page" => 10,
-                "orderby" => "post__in",
-            ];
-        }
+        // Regular search for suggestions
+        $results = pdm_search_products_by_criteria(
+            $search,
+            $is_direct_search ? 1 : 10,
+        );
 
-        if (isset($args)) {
-            $query = new WP_Query($args);
-
-            if ($query->have_posts()) {
-                while ($query->have_posts()) {
-                    $query->the_post();
-                    $product = wc_get_product(get_the_ID());
-                    if ($product) {
-                        $dimensions = wc_format_dimensions(
-                            $product->get_dimensions(false),
-                        );
-                        $dimensions_array = array_map(
-                            "floatval",
-                            $product->get_dimensions(false),
-                        );
-
-                        $results[] = [
-                            "id" => $product->get_id(),
-                            "title" => $product->get_name(),
-                            "sku" => $product->get_sku(),
-                            "image" => get_the_post_thumbnail_url(
-                                get_the_ID(),
-                                "thumbnail",
-                            ),
-                            "meta" => sprintf(
-                                "SKU: %s | Precio: %s",
-                                $product->get_sku(),
-                                wc_price($product->get_price()),
-                            ),
-                            "weight" => $product->get_weight(),
-                            "length" => $dimensions_array["length"] ?? "",
-                            "width" => $dimensions_array["width"] ?? "",
-                            "height" => $dimensions_array["height"] ?? "",
-                            "price" => $product->get_price(),
-                        ];
-                    }
-                }
-                wp_reset_postdata();
-            }
-        }
-
+        error_log(
+            "[PDM] Search product success - Found " .
+                count($results) .
+                " results",
+        );
         wp_send_json_success($results);
     } catch (Exception $e) {
+        error_log("[PDM] Search product error: " . $e->getMessage());
         wp_send_json_error("Error al buscar productos: " . $e->getMessage());
     }
+}
+
+// Helper function to find exact product match
+function pdm_find_exact_product($search)
+{
+    // Try exact SKU match first
+    $products = wc_get_products([
+        "limit" => 1,
+        "meta_key" => "_sku",
+        "meta_value" => $search,
+        "meta_compare" => "=",
+        "status" => "publish",
+    ]);
+
+    if (!empty($products)) {
+        return $products[0];
+    }
+
+    // Try barcode match if numeric and long enough
+    if (is_numeric($search) && strlen($search) >= 10) {
+        $products = wc_get_products([
+            "limit" => 1,
+            "meta_key" => "_global_unique_id",
+            "meta_value" => $search,
+            "meta_compare" => "=",
+            "status" => "publish",
+        ]);
+
+        if (!empty($products)) {
+            return $products[0];
+        }
+    }
+
+    // Try product ID if numeric
+    if (is_numeric($search)) {
+        $product = wc_get_product($search);
+        if ($product && $product->get_status() === "publish") {
+            return $product;
+        }
+    }
+
+    return null;
+}
+
+// Helper function to search products by multiple criteria
+function pdm_search_products_by_criteria($search, $limit = 10)
+{
+    $results = [];
+
+    // 1. Exact SKU matches first
+    $products = wc_get_products([
+        "limit" => $limit,
+        "meta_key" => "_sku",
+        "meta_value" => $search,
+        "meta_compare" => "=",
+        "status" => "publish",
+    ]);
+
+    foreach ($products as $product) {
+        $results[] = pdm_format_product_result($product);
+    }
+
+    // If we have enough results, return them
+    if (count($results) >= $limit) {
+        return array_slice($results, 0, $limit);
+    }
+
+    // 2. Partial SKU matches
+    if (count($results) < $limit) {
+        $remaining = $limit - count($results);
+        $products = wc_get_products([
+            "limit" => $remaining * 2, // Get more to filter duplicates
+            "meta_key" => "_sku",
+            "meta_value" => $search,
+            "meta_compare" => "LIKE",
+            "status" => "publish",
+        ]);
+
+        $existing_ids = array_column($results, "id");
+        foreach ($products as $product) {
+            if (
+                !in_array($product->get_id(), $existing_ids) &&
+                count($results) < $limit
+            ) {
+                $results[] = pdm_format_product_result($product);
+            }
+        }
+    }
+
+    // 3. Barcode search for numeric values
+    if (
+        count($results) < $limit &&
+        is_numeric($search) &&
+        strlen($search) >= 10
+    ) {
+        $remaining = $limit - count($results);
+        $products = wc_get_products([
+            "limit" => $remaining,
+            "meta_key" => "_global_unique_id",
+            "meta_value" => $search,
+            "meta_compare" => "=",
+            "status" => "publish",
+        ]);
+
+        $existing_ids = array_column($results, "id");
+        foreach ($products as $product) {
+            if (
+                !in_array($product->get_id(), $existing_ids) &&
+                count($results) < $limit
+            ) {
+                $results[] = pdm_format_product_result($product);
+            }
+        }
+    }
+
+    // 4. Title search as fallback
+    if (count($results) < $limit) {
+        $remaining = $limit - count($results);
+        $products = wc_get_products([
+            "limit" => $remaining * 2,
+            "name" => $search,
+            "status" => "publish",
+        ]);
+
+        $existing_ids = array_column($results, "id");
+        foreach ($products as $product) {
+            if (
+                !in_array($product->get_id(), $existing_ids) &&
+                count($results) < $limit
+            ) {
+                $results[] = pdm_format_product_result($product);
+            }
+        }
+    }
+
+    return $results;
+}
+
+// Helper function to format product result
+function pdm_format_product_result($product)
+{
+    $dimensions_array = array_map("floatval", $product->get_dimensions(false));
+
+    return [
+        "id" => $product->get_id(),
+        "title" => $product->get_name(),
+        "sku" => $product->get_sku(),
+        "image" => get_the_post_thumbnail_url($product->get_id(), "thumbnail"),
+        "meta" => sprintf(
+            "SKU: %s | Precio: %s",
+            $product->get_sku(),
+            wc_price($product->get_price()),
+        ),
+        "weight" => $product->get_weight(),
+        "length" => $dimensions_array["length"] ?? "",
+        "width" => $dimensions_array["width"] ?? "",
+        "height" => $dimensions_array["height"] ?? "",
+        "price" => $product->get_price(),
+    ];
 }
 add_action("wp_ajax_pdm_search_product", "pdm_search_product");
 
 // AJAX handler para guardar las dimensiones y peso
 function pdm_save_dimensions()
 {
+    error_log(
+        "[PDM] Save dimensions request - Product ID: " .
+            intval($_POST["product_id"] ?? 0) .
+            ", Weight: " .
+            floatval($_POST["weight"] ?? 0) .
+            ", Dimensions: " .
+            floatval($_POST["length"] ?? 0) .
+            "x" .
+            floatval($_POST["width"] ?? 0) .
+            "x" .
+            floatval($_POST["height"] ?? 0),
+    );
     check_ajax_referer("pdm_nonce", "nonce");
 
     // Verificar permisos
     if (!current_user_can("edit_products")) {
+        error_log("[PDM] Save dimensions error: User lacks permissions");
         wp_send_json_error("No tienes permisos para editar productos");
     }
 
@@ -355,41 +463,7 @@ function pdm_save_dimensions()
         // Guardar los cambios
         $product->save();
 
-        // Determine what changed and log accordingly
-        $logger = new Logger();
-        $sku = $product->get_sku();
-
-        // Determine what action to log based on what changed
-        if (
-            $original_weight === 0 &&
-            $original_length === 0 &&
-            $original_width === 0 &&
-            $original_height === 0
-        ) {
-            // If all original values were zero, this is a creation
-            $action = "weight_dimensions_created";
-        } elseif ($weight_changed && $dimensions_changed) {
-            // Both weight and dimensions changed
-            $action = "weight_dimensions_updated";
-        } elseif ($weight_changed) {
-            // Only weight changed
-            $action = "weight_updated";
-        } else {
-            // Only dimensions changed
-            $action = "dimensions_updated";
-        }
-
-        // Log the action with all values
-        $logger->log_action(
-            $product_id,
-            $action,
-            $sku,
-            $weight,
-            $length,
-            $width,
-            $height,
-        );
-
+        error_log("[PDM] Save dimensions success - Product ID: $product_id");
         wp_send_json_success([
             "message" => "Datos actualizados correctamente",
             "weight" => $weight,
@@ -400,6 +474,7 @@ function pdm_save_dimensions()
             ],
         ]);
     } catch (Exception $e) {
+        error_log("[PDM] Save dimensions error: " . $e->getMessage());
         wp_send_json_error("Error al guardar los datos: " . $e->getMessage());
     }
 }
@@ -410,10 +485,16 @@ add_action("wp_ajax_pdm_get_ips", "pdm_get_available_ips");
 
 function pdm_get_available_ips()
 {
+    error_log("[PDM] Get available IPs request");
     check_ajax_referer("pdm_nonce", "nonce");
 
     $ip_manager = new IP_Arduinos();
     $available_ips = $ip_manager->get_available_ips();
 
+    error_log(
+        "[PDM] Get available IPs success - Found " .
+            count($available_ips) .
+            " IPs",
+    );
     wp_send_json_success($available_ips);
 }

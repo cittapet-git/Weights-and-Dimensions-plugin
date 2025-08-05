@@ -12,7 +12,7 @@ class IP_Arduinos
         // Available IPs for connection
         $this->available_ips = [
             [
-                "ip" => "http://localhost/arduino-server.php",
+                "ip" => "http://localhost:8888/arduino-server.php",
                 "name" => "Arduino Simulator (Local)",
             ],
             [
