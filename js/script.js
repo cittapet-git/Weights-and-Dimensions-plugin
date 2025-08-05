@@ -1,4 +1,13 @@
+/*
+ * OPTIMIZACIONES IMPLEMENTADAS:
+ * - Conexiones cada 5 minutos (antes 30 segundos)
+ * - Cache de mediciones (5 segundos) y conexiones (5 minutos)
+ * - Bloqueo de conexiones externas (solo localhost permitido)
+ * - Delay entre mediciones aumentado a 2 segundos (antes 400ms)
+ * - Cache se limpia al cambiar de producto
+ */
 const DEBUG_MODE = true;
+const ALLOW_EXTERNAL_CONNECTIONS = false; // SEGURIDAD: Cambiar a true solo si necesitas conexiones externas
 jQuery(document).ready(function($) {
     // Configuración del modo debug
      // Cambiar a false para deshabilitar logs
@@ -95,15 +104,35 @@ jQuery(document).ready(function($) {
         }
     }
 
-    // Función para verificar la conexión con el servidor de mediciones
+    // Función para verificar la conexión con el servidor de mediciones (con cache)
     async function checkConnection() {
+        const now = Date.now();
+        
+        // Usar cache si está disponible y no ha expirado
+        if (connectionCache.lastCheck && 
+            (now - connectionCache.lastCheck) < connectionCache.cacheDuration) {
+            debug('Usando conexión desde cache');
+            updateConnectionStatus(connectionCache.isConnected ? 'connected' : 'disconnected');
+            return;
+        }
+        
         debug('Verificando conexión:', MEASUREMENT_SERVER.host);
         updateConnectionStatus('connecting');
         
+        // PREVENIR CONEXIONES EXTERNAS - Solo permitir localhost y IPs privadas
         const url = `${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.ip}`;
-        debug('URL completa:', url);
         
         try {
+            const urlObj = new URL(url);
+            const hostname = urlObj.hostname;
+            
+            // Bloquear conexiones externas
+            if (!isLocalOrPrivateIP(hostname)) {
+                throw new Error('Conexiones externas no permitidas');
+            }
+            
+            debug('URL local permitida:', url);
+            
             const response = await fetch(url);
             
             if (!response.ok) {
@@ -114,8 +143,12 @@ jQuery(document).ready(function($) {
             
             // Verificar que la respuesta contiene una IP
             if (data && data.ip) {
+                connectionCache.isConnected = true;
+                connectionCache.lastCheck = now;
                 updateConnectionStatus('connected');
             } else {
+                connectionCache.isConnected = false;
+                connectionCache.lastCheck = now;
                 updateConnectionStatus('disconnected', 'Arduino no responde correctamente');
                 throw new Error('Respuesta del Arduino no contiene IP');
             }
@@ -125,9 +158,33 @@ jQuery(document).ready(function($) {
                 message: error.message,
                 url: url
             });
+            connectionCache.isConnected = false;
+            connectionCache.lastCheck = now;
             updateConnectionStatus('disconnected', error.message);
             throw error;
         }
+    }
+    
+    // Función para verificar si una IP es local o privada
+    function isLocalOrPrivateIP(hostname) {
+        // Si las conexiones externas están deshabilitadas, solo permitir localhost
+        if (!ALLOW_EXTERNAL_CONNECTIONS) {
+            return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+        }
+        
+        // Permitir localhost
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+            return true;
+        }
+        
+        // Permitir IPs privadas solo si las conexiones externas están habilitadas
+        const privateRanges = [
+            /^10\./,                    // 10.0.0.0/8
+            /^172\.(1[6-9]|2[0-9]|3[0-1])\./,  // 172.16.0.0/12
+            /^192\.168\./               // 192.168.0.0/16
+        ];
+        
+        return privateRanges.some(range => range.test(hostname));
     }
 
     // Función para crear el editor de IP del servidor
@@ -229,8 +286,8 @@ jQuery(document).ready(function($) {
     function startConnectionCheck() {
         checkConnection(); // Verificación inicial
         
-        // Usar una referencia a función en lugar de una cadena
-        connectionCheckInterval = setInterval(checkConnection, 30000);
+        // Verificación cada 5 minutos para reducir carga del servidor
+        connectionCheckInterval = setInterval(checkConnection, 300000);
     }
 
     // Escuchar eventos de teclado en todo el documento
@@ -397,10 +454,15 @@ jQuery(document).ready(function($) {
             }
         });
         
-        // Resetear el estado de medición
+        // Resetear el estado de medición y limpiar cache
         currentField = null;
         isMeasuring = false;
         measurementInterval = null;
+        
+        // Limpiar cache de mediciones al cambiar de producto
+        measurementCache.weight = { value: null, timestamp: 0 };
+        measurementCache.dimension = { value: null, timestamp: 0 };
+        
         updateFieldVisuals();
         
         productInfo.show();
@@ -461,20 +523,42 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // Función para obtener el peso de la balanza
+    // Función para obtener el peso de la balanza (con cache y validación)
     async function getWeight() {
+        const now = Date.now();
+        
+        // Usar cache si está disponible y no ha expirado
+        if (measurementCache.weight.value !== null && 
+            (now - measurementCache.weight.timestamp) < measurementCache.cacheDuration) {
+            debug('Usando peso desde cache:', measurementCache.weight.value);
+            return measurementCache.weight.value;
+        }
+        
         const weightUrl = `${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.weight}`;
         debug('Iniciando petición de peso a', weightUrl);
+        
         try {
+            const urlObj = new URL(weightUrl);
+            const hostname = urlObj.hostname;
+            
+            // Bloquear conexiones externas
+            if (!isLocalOrPrivateIP(hostname)) {
+                throw new Error('Conexiones externas no permitidas para mediciones');
+            }
+            
             const response = await fetch(weightUrl);
             debug('Respuesta del servidor de peso:', response);
             const data = await response.json();
             debug('Datos de peso recibidos:', data);
             
             // Extraer el valor y formatearlo a 2 decimales
-            // Asumiendo que la respuesta del peso tiene un formato similar
             const weight = Number(data.peso_kg || data.weight || data.value).toFixed(2);
             debug('Peso formateado:', weight);
+            
+            // Actualizar cache
+            measurementCache.weight.value = weight;
+            measurementCache.weight.timestamp = now;
+            
             return weight;
         } catch (error) {
             debugError('Error detallado al obtener el peso:', {
@@ -485,11 +569,29 @@ jQuery(document).ready(function($) {
         }
     }
 
-    // Función para obtener dimensiones
+    // Función para obtener dimensiones (con cache y validación)
     async function getDimension() {
+        const now = Date.now();
+        
+        // Usar cache si está disponible y no ha expirado
+        if (measurementCache.dimension.value !== null && 
+            (now - measurementCache.dimension.timestamp) < measurementCache.cacheDuration) {
+            debug('Usando dimensión desde cache:', measurementCache.dimension.value);
+            return measurementCache.dimension.value;
+        }
+        
         const dimensionUrl = `${MEASUREMENT_SERVER.host}${MEASUREMENT_SERVER.endpoints.dimension}`;
         debug('Iniciando petición de dimensión a', dimensionUrl);
+        
         try {
+            const urlObj = new URL(dimensionUrl);
+            const hostname = urlObj.hostname;
+            
+            // Bloquear conexiones externas
+            if (!isLocalOrPrivateIP(hostname)) {
+                throw new Error('Conexiones externas no permitidas para mediciones');
+            }
+            
             const response = await fetch(dimensionUrl);
             debug('Respuesta del servidor de dimensiones:', response);
             const data = await response.json();
@@ -498,6 +600,11 @@ jQuery(document).ready(function($) {
             // Extraer el valor y formatearlo a 2 decimales
             const dimension = Number(data.dimension_cm).toFixed(2);
             debug('Dimensión formateada:', dimension);
+            
+            // Actualizar cache
+            measurementCache.dimension.value = dimension;
+            measurementCache.dimension.timestamp = now;
+            
             return dimension;
         } catch (error) {
             debugError('Error detallado al obtener la dimensión:', {
@@ -510,7 +617,20 @@ jQuery(document).ready(function($) {
 
     // Variables para controlar las mediciones continuas
     let measurementInterval = null;
-    const MEASUREMENT_DELAY = 400; // 250ms entre mediciones
+    const MEASUREMENT_DELAY = 2000; // 2 segundos entre mediciones para reducir carga
+    
+    // Cache para conexiones y mediciones
+    let connectionCache = {
+        lastCheck: 0,
+        isConnected: false,
+        cacheDuration: 300000 // 5 minutos
+    };
+    
+    let measurementCache = {
+        weight: { value: null, timestamp: 0 },
+        dimension: { value: null, timestamp: 0 },
+        cacheDuration: 5000 // 5 segundos
+    };
 
     // Función modificada para obtener el peso continuamente
     async function startContinuousWeight($input, $measureBtn, $stopBtn) {
