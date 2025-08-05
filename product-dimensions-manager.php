@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Weights and Dimensions Manager
+Plugin Name: Pesos y Dimensiones
 Description: Allows employees to search products by barcode and manage weights and dimensions
 Version: 1.0
 Author: Sebastián Vera
@@ -21,22 +21,22 @@ function pdm_enqueue_scripts($hook)
     }
 
     wp_enqueue_style("pdm-styles", plugins_url("css/style.css", __FILE__));
-    
+
     // Enqueue SweetAlert2
     wp_enqueue_style(
         "sweetalert2-css",
         "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css",
         [],
-        "11"
+        "11",
     );
     wp_enqueue_script(
         "sweetalert2-js",
         "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js",
         [],
         "11",
-        true
+        true,
     );
-    
+
     wp_enqueue_script(
         "pdm-script",
         plugins_url("js/script.js", __FILE__),
@@ -55,8 +55,8 @@ add_action("admin_enqueue_scripts", "pdm_enqueue_scripts");
 function pdm_add_menu_page()
 {
     add_menu_page(
-        "Weights and Dimensions Manager",
-        "Weights and Dimensions",
+        "Pesos y Dimensiones",
+        "Pesos y Dimensiones",
         "manage_options",
         "product-dimensions-manager",
         "pdm_render_page",
